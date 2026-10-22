@@ -154,7 +154,7 @@ p { margin: 0; }
 .ans.good { background: var(--good-soft); color: var(--good); border-color: var(--good); box-shadow: inset 0 -5px 0 var(--good); }
 .answers.locked .ans:not(.good) { opacity: .5; }
 
-.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
 .ctl {
   border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 12px 8px;
   display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 650; font-size: .88rem;
@@ -641,6 +641,7 @@ const Piano = (() => {
   const ICON = {
     cadence: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 18V9M9 18V6M14 18v-7M19 18V4"/></svg>',
     note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="17" r="3"/><path d="M11 17V4l8 2"/></svg>',
+    skip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5l8 7-8 7zM17 5v14"/></svg>',
     kbd: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M8 5v8M12 5v14M16 5v8"/></svg>',
   };
 
@@ -965,7 +966,7 @@ const Piano = (() => {
   function finish() {
     Piano.stopAll(); micStop();
     const hist = Store.get('history', []);
-    hist.push({ date: Date.now(), title: S.title, type: S.type || 'notes', score: S.firstTry, total: S.n, mode: S.mode, notes: S.notes, degrees: S.degrees, missed: S.missed });
+    hist.push({ date: Date.now(), title: S.title, type: S.type || 'notes', score: S.firstTry, total: S.n - (S.skipped || 0), skipped: S.skipped || 0, mode: S.mode, notes: S.notes, degrees: S.degrees, missed: S.missed });
     Store.set('history', hist.slice(-500));
     screen = 'results';
     renderResults();
@@ -1026,13 +1027,15 @@ const Piano = (() => {
   }
 
   function renderResults() {
-    const pct = Math.round((S.firstTry / S.n) * 100);
+    const total = S.n - (S.skipped || 0);
+    const pct = total ? Math.round((S.firstTry / total) * 100) : 0;
     const weak = Object.entries(S.missed).sort((a, b) => b[1] - a[1]);
     $app.innerHTML = `
       <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
       <div class="panel" style="text-align:center;align-items:center">
         <span class="eyebrow">${esc(S.title)} · terminé</span>
-        <div class="big-score">${S.firstTry}<small> / ${S.n}</small></div>
+        <div class="big-score">${S.firstTry}<small> / ${total}</small></div>
+        ${S.skipped ? `<p class="muted">${S.skipped} question${S.skipped > 1 ? 's' : ''} passée${S.skipped > 1 ? 's' : ''}, non comptée${S.skipped > 1 ? 's' : ''} dans le score</p>` : ''}
         <p class="muted">${pct} % ${S.type === 'instrument' ? 'trouvées sans voir la note' : 'trouvées du premier coup'}</p>
         ${S.type === 'instrument' && S.times.length ? `<p class="muted">Temps moyen pour trouver une note : <b>${(S.times.reduce((a, b) => a + b, 0) / S.times.length).toFixed(1).replace('.', ',')} s</b></p>` : ''}
       </div>
@@ -1329,7 +1332,7 @@ const Piano = (() => {
     S = {
       type: 'instrument', title: 'Instrument', set: s, mode: s.mode, resScale: scale, notes: scale,
       range: instRange(s), n: Math.max(1, Math.min(200, s.questions || 20)),
-      i: 0, firstTry: 0, missed: {}, times: [], token: 0, keyPc: null, prevMidi: null,
+      i: 0, firstTry: 0, skipped: 0, missed: {}, times: [], token: 0, keyPc: null, prevMidi: null,
     };
     S.title = (s.instrument === 'melodica' ? 'Mélodica' : 'Guitare') + ' · ' + { none: 'note seule', tonic: 'tonique', degree: 'degré' }[s.context];
     screen = 'play'; pushScreen();
@@ -1340,7 +1343,7 @@ const Piano = (() => {
       $app.innerHTML = `
         <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
         <div class="panel"><h2>Le micro n'est pas disponible</h2>
-        <p class="muted">${e && e.name === 'NotAllowedError' ? 'L\'accès au micro a été refusé. Autorise-le dans les réglages du navigateur (icône à gauche de l\'adresse), puis recommence.'
+        <p class="muted">${e && e.name === 'NotAllowedError' ? 'L\'accès au micro a été refusé. Sur Android : Paramètres du téléphone → Applications → ton navigateur (Chrome ou Firefox) → Autorisations → Microphone → Autoriser. Puis, dans le navigateur, vérifie les permissions du site (Chrome : ⋮ → Paramètres → Paramètres des sites → Micro ; Firefox : ⋮ → Paramètres → Permissions des sites). Ferme l\'app, rouvre-la et recommence. Sur ordinateur : icône à gauche de l\'adresse → Micro → Autoriser.'
           : 'Cette page ne peut pas utiliser le micro. Ouvre « Ouvrir Hear-Trainer.html » sur ton Mac, de préférence dans Chrome, ou la version installée sur ton téléphone.'}</p></div>`;
       S = null; return;
     }
@@ -1435,6 +1438,18 @@ const Piano = (() => {
     Piano.sequence([{ at: 0.1, midis: [q.midi], dur: 1.1, vel: 0.9 }], 0.4, releaseTime()).then(() => { if (S && tok === S.token) nextQuestion(false); });
   }
 
+  /** Passer la question (quand le micro ne reconnaît pas une note pourtant juste). Ne compte pas dans le score. */
+  function skipInstrument() {
+    const q = S.q;
+    if (!q || q.solved) return;
+    q.solved = true; q.skipped = true; q.listening = false;
+    S.skipped++;
+    updateRing(); renderReveal();
+    setStatus('Question passée.');
+    const tok = ++S.token; Piano.stopAll();
+    Piano.sequence([{ at: 0.1, midis: [q.midi], dur: 1.1, vel: 0.9 }], 0.4, releaseTime()).then(() => { if (S && tok === S.token) nextQuestion(false); });
+  }
+
   function revealLabel() {
     const q = S.q;
     const name = noteFr(q.midi, S.set.octaveExact);
@@ -1480,6 +1495,7 @@ const Piano = (() => {
         ${s.context !== 'none' ? `<button class="ctl" data-act="replay-cadence">${ICON.cadence}Cadence</button>` : ''}
         <button class="ctl" data-act="inst-replay">${ICON.note}Rejouer</button>
         <button class="ctl" data-act="inst-reveal">${ICON.kbd}Voir la note</button>
+        <button class="ctl" data-act="inst-skip">${ICON.skip}Passer</button>
       </div>`;
     renderReveal(); updateRing();
   }
@@ -1506,6 +1522,7 @@ const Piano = (() => {
       case 'answer-chord': answerChord(Number(v)); break;
       case 'inst-replay': playInstrumentQuestion(false); break;
       case 'inst-reveal': revealNote(); break;
+      case 'inst-skip': skipInstrument(); break;
       case 'replay-chords': replayChords(); break;
       case 'chord-help':
         S.kbdOpen = !S.kbdOpen;
