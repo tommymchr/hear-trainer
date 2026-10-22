@@ -263,6 +263,32 @@ p { margin: 0; }
   background: color-mix(in srgb, var(--c) 16%, var(--surface)); box-shadow: inset 0 -4px 0 var(--c); color: var(--ink);
 }
 
+/* Analyse de la dictée */
+.ana { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ana-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.mini-toggle { border: 1px solid var(--line); background: var(--bg); border-radius: 99px; padding: 6px 12px; font-size: .8rem; font-weight: 700; color: var(--muted); }
+.mini-toggle[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.ana-bars { display: flex; flex-wrap: wrap; gap: 8px; }
+.ana-bar { position: relative; display: flex; gap: 6px; padding: 18px 8px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); flex: 1 1 auto; }
+.ana-num { position: absolute; top: 3px; left: 8px; font-size: .68rem; font-weight: 700; color: var(--muted); }
+.ana-seg { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ana-notes { display: flex; gap: 4px; }
+.ana-note {
+  position: relative; min-width: 54px; padding: 6px 4px; border-radius: 8px; text-align: center; display: flex; flex-direction: column; gap: 1px;
+  border: 2px solid var(--c);
+}
+.ana-note.ct { background: color-mix(in srgb, var(--c) 22%, var(--surface)); }
+.ana-note.nct { background: var(--surface); border-style: dashed; }
+.ana-note.strong::before { content: "▲"; position: absolute; top: 2px; right: 4px; font-size: .55rem; line-height: 1; color: var(--ink); }
+.ana-note b { font-family: var(--font-display); font-size: 1.05rem; }
+.ana-note span { font-size: .7rem; font-weight: 700; color: var(--muted); }
+.ana-note em { font-size: .66rem; font-style: normal; font-weight: 700; color: var(--accent); }
+.ana-empty { color: var(--muted); padding: 6px; }
+.gloss { margin: 0; display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--line); padding-top: 10px; }
+.gloss div { display: grid; grid-template-columns: 7.5em 1fr; gap: 8px; font-size: .84rem; line-height: 1.4; }
+.gloss dt { font-weight: 800; }
+.gloss dd { margin: 0; color: var(--muted); min-width: 0; }
+
 </style>
 </head>
 <body>
@@ -543,13 +569,34 @@ const Melody = (() => {
   }
 
   /** Construit les emplacements { beat, dur, root, strong } à partir des cellules et de l'harmonie. */
+  const splitOf = (chords) => chords.split || 2;
+
+  /**
+   * La dernière note (la tonique) doit tomber sur l'accord de I : si elle commence avant le 3e temps
+   * d'une dernière mesure « V–I », on avance le I jusqu'à elle (ou on reporte le V à la mesure d'avant).
+   */
+  function fixEnding(cells, prog) {
+    const L = cells.length - 1;
+    const tf = cells[L].slice(0, -1).reduce((a, b) => a + b, 0);
+    const last = prog[L];
+    if (last.length === 2 && last[1] === 0 && tf < splitOf(last)) {
+      if (tf > 0) last.split = tf;
+      else {
+        const x = last[0];
+        prog[L] = [0];
+        if (L > 0 && prog[L - 1].length === 1 && prog[L - 1][0] !== x) prog[L - 1] = [prog[L - 1][0], x];
+      }
+    } else if (last.length === 1 && last[0] !== 0) prog[L] = [0];
+    return prog;
+  }
+
   function buildSlots(cells, prog) {
     const slots = [];
     cells.forEach((cell, b) => {
       let t = 0;
       cell.forEach((d) => {
         const chords = prog[b];
-        const root = chords.length === 2 && t >= 2 ? chords[1] : chords[0];
+        const root = chords.length === 2 && t >= splitOf(chords) ? chords[1] : chords[0];
         slots.push({ beat: b * 4 + t, dur: d, root, strong: t === 0 || t === 2 });
         t += d;
       });
@@ -647,6 +694,7 @@ const Melody = (() => {
     const counts = [...splitCounts(n - endCount, rng), endCount];
     const cells = counts.map((c, k) => [...pick(k === counts.length - 1 ? END_CELLS[c] : CELLS[c], rng)]);
     const { prog, name } = progressionFor(cells.length, rng, scale);
+    fixEnding(cells, prog);
     const slots = buildSlots(cells, prog);
     const seq = fillPitches(slots, L, scale, rng);
     return seq && { seq, slots, prog, cells, name };
@@ -659,7 +707,7 @@ const Melody = (() => {
     const cell = pick(CELLS[c], rng);
     const shift = pick([1, -1, 2, -2], rng);
     const cells = [[...cell], [...cell], [...pick(END_CELLS[rest], rng)]];
-    const prog = [[0], [mod(shift, 7)], [4, 0]];
+    const prog = fixEnding(cells, [[0], [mod(shift, 7)], [4, 0]]);
     const slots = buildSlots(cells, prog);
     // motif sur l'accord de I, sans contrainte de fin
     const motifSlots = slots.slice(0, c);
@@ -680,13 +728,44 @@ const Melody = (() => {
     const notes = seq.map((x, i) => ({ idx: x, semi: toSemi(x), beat: slots[i].beat, dur: slots[i].dur, root: slots[i].root }));
     const harmony = [];
     prog.forEach((chords, b) => {
-      if (chords.length === 2) { harmony.push({ beat: b * 4, dur: 2, root: chords[0] }); harmony.push({ beat: b * 4 + 2, dur: 2, root: chords[1] }); }
+      if (chords.length === 2) {
+        const sp = splitOf(chords);
+        harmony.push({ beat: b * 4, dur: sp, root: chords[0] }); harmony.push({ beat: b * 4 + sp, dur: 4 - sp, root: chords[1] });
+      }
       else harmony.push({ beat: b * 4, dur: 4, root: chords[0] });
     });
     return { notes, harmony, bars: cells.length, cells, prog, name: name || '', motif: motif || null };
   }
 
-  return { LEVELS, TEMPO, CELLS, END_CELLS, PROGS, generate, isChordTone, mod };
+  const ROLES = ['fondamentale', 'seconde', 'tierce', 'quarte', 'quinte', 'sixte', 'septième'];
+
+  /**
+   * Analyse de chaque note par rapport à l'accord sur lequel elle tombe :
+   * rôle dans l'accord, note de l'accord ou étrangère, temps fort, et type de note étrangère
+   * (passage, broderie, appoggiature, échappée, anticipation, libre).
+   */
+  function analyze(mel) {
+    const s = mel.notes.map((n) => n.idx);
+    return mel.notes.map((n, i) => {
+      const interval = mod(n.idx - n.root, 7);
+      const chordTone = [0, 2, 4].includes(interval);
+      const strong = n.beat % 2 === 0;
+      let nct = null;
+      if (!chordTone) {
+        const d1 = i > 0 ? s[i] - s[i - 1] : null;
+        const d2 = i < s.length - 1 ? s[i + 1] - s[i] : null;
+        const a1 = d1 === null ? null : Math.abs(d1), a2 = d2 === null ? null : Math.abs(d2);
+        if (a1 === 1 && a2 === 1) nct = Math.sign(d1) === Math.sign(d2) ? 'passage' : 'broderie';
+        else if (a1 >= 2 && a2 === 1) nct = 'appoggiature';
+        else if (a1 === 1 && a2 >= 2) nct = 'échappée';
+        else if (a2 === 0) nct = 'anticipation';
+        else nct = 'libre';
+      }
+      return { interval, role: ROLES[interval], chordTone, strong, nct };
+    });
+  }
+
+  return { LEVELS, TEMPO, CELLS, END_CELLS, PROGS, ROLES, generate, analyze, isChordTone, mod };
 })();
 if (typeof module !== 'undefined') module.exports = Melody;
 
@@ -877,7 +956,7 @@ const Piano = (() => {
   const MEL_DEFAULTS = {
     scale: 'major', level: 'medium', count: 'auto', tempo: 'medium', accomp: false,
     tonalite: 'random-not-c', changeKey: 'exercise', showKey: true, cadenceEach: true, notation: 'degres',
-    articulation: 'legato', questions: 10, help: true,
+    articulation: 'legato', questions: 10, help: true, nctTypes: true,
   };
   const MEL_BUILTIN = [
     { id: 'mel', type: 'melody', glyph: '♫', title: 'Dictée mélodique', sub: 'Cadence, puis une courte mélodie à retrouver note par note' },
@@ -1895,7 +1974,7 @@ const Piano = (() => {
 
   function replayMelody(from = 0) {
     const tok = ++S.token; Piano.stopAll();
-    Piano.sequence(melodyEvents(from, 0, from === 0 && S.set.accomp).ev, 0, releaseTime())
+    Piano.sequence(melodyEvents(from, 0, from === 0 && (S.set.accomp || S.q.solved)).ev, 0, releaseTime())
       .then(() => { if (S && tok === S.token && !S.q.solved) setStatus(melodyPrompt(), S.q.wrong.size ? 'bad' : ''); });
   }
 
@@ -1922,20 +2001,64 @@ const Piano = (() => {
     if (clean) S.firstTry++;
     renderPlayMelody();
     setStatus(clean ? 'Bravo ! Écoute-la avec ses accords.' : 'Trouvé. Écoute-la avec ses accords.', 'good');
-    const tok = ++S.token; Piano.stopAll();
+    Piano.stopAll(); S.token++;
     const { ev } = melodyEvents(0, 0.2, true);
-    Piano.sequence(ev, 0.5, releaseTime()).then(() => { if (S && tok === S.token) nextQuestion(false); });
+    Piano.sequence(ev, 0.5, releaseTime());
   }
 
-  /** La progression d'accords cachée, mesure par mesure, aux couleurs des fonctions. */
-  function progressionHtml() {
-    const mel = S.q.mel;
-    const bars = mel.prog.map((chords) => `<span class="prog-bar">${chords.map((r) =>
-      `<span class="prog-chord" style="--c:var(--deg${r})">${esc(M.triad(S.resScale, r).name)}</span>`).join('')}</span>`).join('');
-    return `<div class="prog" aria-label="Progression utilisée">
-      <span class="eyebrow">Construite sur · ${esc(mel.name)}</span>
-      <div class="prog-bars">${bars}</div>
-    </div>`;
+  /**
+   * Écran de fin : la progression cachée et l'analyse de chaque note par rapport à son accord
+   * (rôle, note de l'accord ou étrangère, temps fort, et en option le type de note étrangère).
+   */
+  const NCT_HELP = {
+    passage: 'relie deux notes en avançant par degrés voisins dans le même sens (ex. 3 – 2 – 1 sur l\'accord de I : le 2 est de passage).',
+    broderie: 'quitte une note d\'un degré puis y revient (ex. 5 – 6 – 5) : elle « brode » autour de la note.',
+    appoggiature: 'arrive par un saut, souvent sur un temps fort, puis se résout d\'un degré vers une note de l\'accord. C\'est la plus expressive : elle crée une tension qui se relâche.',
+    'échappée': 'arrive par un degré voisin, puis s\'échappe par un saut au lieu de se résoudre.',
+    anticipation: 'joue en avance une note qui est répétée juste après, souvent la note du prochain accord.',
+    libre: 'note étrangère qui n\'entre dans aucun de ces cas (elle arrive et repart par des sauts).',
+  };
+
+  /** Petit lexique : uniquement les types de notes étrangères présents dans la mélodie affichée. */
+  function glossaryHtml(an, showTypes) {
+    if (!showTypes) return '';
+    const types = [...new Set(an.map((a) => a.nct).filter(Boolean))];
+    if (!types.length) return '';
+    return `<dl class="gloss">${types.map((t) => `<div><dt>${esc(t[0].toUpperCase() + t.slice(1))}</dt><dd>${esc(NCT_HELP[t])}</dd></div>`).join('')}</dl>`;
+  }
+
+  function analysisHtml() {
+    const mel = S.q.mel, s = S.set;
+    const an = Melody.analyze(mel);
+    const showTypes = s.nctTypes !== false;
+    const bars = mel.prog.map((chords, b) => {
+      const segs = mel.harmony.filter((h) => Math.floor(h.beat / 4) === b);
+      const segHtml = segs.map((h) => {
+        const idxs = mel.notes.map((n, i) => i).filter((i) => mel.notes[i].beat >= h.beat && mel.notes[i].beat < h.beat + h.dur);
+        const notes = idxs.map((i) => {
+          const a = an[i], n = mel.notes[i];
+          return `<div class="ana-note ${a.chordTone ? 'ct' : 'nct'}${a.strong ? ' strong' : ''}" style="--c:var(--deg${h.root})">
+            <b>${esc(M.label(n.semi, s.notation))}</b>
+            <span>${esc(a.role)}</span>
+            ${showTypes && a.nct ? `<em>${esc(a.nct)}</em>` : ''}
+          </div>`;
+        }).join('') || '<div class="ana-empty">—</div>';
+        return `<div class="ana-seg">
+          <span class="prog-chord" style="--c:var(--deg${h.root})">${esc(M.triad(S.resScale, h.root).name)}</span>
+          <div class="ana-notes">${notes}</div>
+        </div>`;
+      }).join('');
+      return `<div class="ana-bar"><span class="ana-num">${b + 1}</span>${segHtml}</div>`;
+    }).join('');
+    return `<section class="ana" aria-label="Analyse de la mélodie">
+      <div class="ana-head">
+        <span class="eyebrow">Construite sur · ${esc(mel.name)}</span>
+        <button class="mini-toggle" data-act="mel-nct" aria-pressed="${showTypes}">Types de notes étrangères</button>
+      </div>
+      <div class="ana-bars">${bars}</div>
+      <p class="hint">La mélodie est posée sur une grille d'accords cachée (celle ci-dessus) : sur les temps forts, elle tombe surtout sur des notes de l'accord ; entre elles, des notes étrangères font le lien.</p>
+      ${glossaryHtml(an, showTypes)}
+    </section>`;
   }
 
   function renderPlayMelody() {
@@ -1952,18 +2075,18 @@ const Piano = (() => {
         <span class="key">${s.showKey === false ? '?' : esc(M.keyName(S.keyPc, S.mode))}</span>
         <div class="slots mel">${q.midis.map((m, k) =>
           `<span class="slot${k < q.pos ? ' done-plain' : ''}${k === q.pos && !q.solved ? ' current' : ''}">${k < q.pos ? esc(M.label(m - S.t, s.notation)) : '?'}</span>`).join('')}</div>
-        ${q.solved ? progressionHtml() : ''}
         ${statusHtml()}
       </div>
-      <div class="answers${q.solved ? ' locked' : ''}">${S.notes.map((n) =>
-        `<button class="ans${M.isAltered(n) ? ' alt' : ''}" data-act="answer-mel" data-v="${n}">${esc(M.label(n, s.notation))}</button>`).join('')}</div>
+      ${q.solved ? analysisHtml() + `<button class="btn wide" data-act="mel-next">${S.i >= S.n ? 'Voir les résultats' : 'Question suivante'}</button>` : ''}
+      ${q.solved ? '' : `<div class="answers">${S.notes.map((n) =>
+        `<button class="ans${M.isAltered(n) ? ' alt' : ''}" data-act="answer-mel" data-v="${n}">${esc(M.label(n, s.notation))}</button>`).join('')}</div>`}
       <div class="controls">
         <button class="ctl" data-act="replay-cadence">${ICON.cadence}Cadence</button>
         <button class="ctl" data-act="mel-replay">${ICON.note}Mélodie</button>
         <button class="ctl" data-act="mel-from" ${q.pos === 0 || q.solved ? 'disabled' : ''}>${ICON.skip}Depuis ici</button>
-        ${s.help ? `<button class="ctl" data-act="mel-kbd" aria-pressed="${S.kbdOpen}">${ICON.kbd}Clavier</button>` : ''}
+        ${s.help || q.solved ? `<button class="ctl" data-act="mel-kbd" aria-pressed="${S.kbdOpen}">${ICON.kbd}Clavier</button>` : ''}
       </div>
-      ${s.help && S.kbdOpen ? renderKeyboard() : ''}`;
+      ${(s.help || q.solved) && S.kbdOpen ? renderKeyboard() : ''}`;
     q.wrong.forEach((w) => $app.querySelector(`.ans[data-v="${w}"]`)?.classList.add('bad'));
   }
 
@@ -1993,6 +2116,12 @@ const Piano = (() => {
       case 'answer-mel': answerMelody(Number(v)); break;
       case 'mel-replay': replayMelody(0); break;
       case 'mel-from': replayMelody(S.q.pos); break;
+      case 'mel-next': Piano.stopAll(); S.kbdOpen = false; nextQuestion(false); break;
+      case 'mel-nct': {
+        S.set.nctTypes = S.set.nctTypes === false;
+        const st = Store.get('settings:mel', {}); st.nctTypes = S.set.nctTypes; Store.set('settings:mel', st);
+        renderPlayMelody(); break;
+      }
       case 'mel-kbd':
         S.kbdOpen = !S.kbdOpen;
         if (S.kbdOpen && !S.q.solved) S.q.helped = true;
