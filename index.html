@@ -254,6 +254,15 @@ p { margin: 0; }
 .slot.done-plain { border: 1px solid var(--good); background: var(--good-soft); color: var(--good); }
 .ctl[disabled] { opacity: .4; cursor: default; }
 
+/* Progression affichée après une dictée réussie */
+.prog { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 6px; }
+.prog-bars { display: flex; flex-wrap: wrap; justify-content: center; gap: 0; border-left: 2px solid var(--line); }
+.prog-bar { display: flex; gap: 4px; padding: 4px 8px; border-right: 2px solid var(--line); }
+.prog-chord {
+  min-width: 38px; text-align: center; padding: 5px 8px; border-radius: 8px; font-family: var(--font-display); font-weight: 750;
+  background: color-mix(in srgb, var(--c) 16%, var(--surface)); box-shadow: inset 0 -4px 0 var(--c); color: var(--ink);
+}
+
 </style>
 </head>
 <body>
@@ -463,11 +472,42 @@ const Melody = (() => {
   // Dernière mesure : la note finale est longue.
   const END_CELLS = { 1: [[4]], 2: [[2, 2], [1, 3]], 3: [[1, 1, 2], [1.5, 0.5, 2]] };
 
-  // Harmonies cachées (racines en degrés : 0 = I, 1 = ii, 3 = IV, 4 = V, 5 = vi), un tableau par mesure.
+  // Harmonies cachées : racines en degrés (0 = I, 1 = ii, 2 = iii, 3 = IV, 4 = V, 5 = vi, 6 = vii/VII),
+  // un tableau par mesure (un ou deux accords). `minor: true` = seulement en mineur naturel.
   const PROGS = {
-    2: [[[0], [4, 0]], [[0], [3, 0]]],
-    3: [[[0], [3], [4, 0]], [[0], [1], [4, 0]], [[0], [5], [4, 0]]],
-    4: [[[0], [5], [3], [4, 0]], [[0], [3], [0], [4, 0]], [[0], [1], [4], [0]], [[0], [3], [4], [0]]],
+    2: [
+      { name: 'Cadence parfaite', bars: [[0], [4, 0]] },
+      { name: 'Cadence plagale', bars: [[0], [3, 0]] },
+      { name: 'Jazz', bars: [[1, 4], [0]] },
+      { name: 'Classique', bars: [[0, 3], [4, 0]] },
+      { name: 'Détour par vi', bars: [[0, 5], [4, 0]] },
+      { name: 'Préparation par ii', bars: [[0, 1], [4, 0]] },
+    ],
+    3: [
+      { name: 'Classique', bars: [[0], [3], [4, 0]] },
+      { name: 'Préparation par ii', bars: [[0], [1], [4, 0]] },
+      { name: 'Détour par vi', bars: [[0], [5], [4, 0]] },
+      { name: 'Jazz', bars: [[1], [4], [0]] },
+      { name: 'Préparation par ii', bars: [[0], [1, 4], [0]] },
+      { name: 'Turnaround des années 50', bars: [[0], [5, 1], [4, 0]] },
+      { name: 'Rock éolien', bars: [[0], [5, 6], [0]], minor: true },
+      { name: 'Pop', bars: [[0, 4], [5, 3], [0]] },
+      { name: 'Pop, départ sur vi', bars: [[5, 3], [0, 4], [0]] },
+      { name: 'Turnaround des années 50', bars: [[0, 5], [1, 4], [0]] },
+      { name: 'Années 50', bars: [[0], [5, 3], [4, 0]] },
+      { name: 'Andalouse', bars: [[0, 6], [5, 4], [0]], minor: true },
+    ],
+    4: [
+      { name: 'Années 50', bars: [[0], [5], [3], [4, 0]] },
+      { name: 'Pop', bars: [[0], [4], [5], [3, 0]] },
+      { name: 'Pop, départ sur vi', bars: [[5], [3], [0], [4, 0]] },
+      { name: 'Turnaround des années 50', bars: [[0], [5], [1], [4, 0]] },
+      { name: 'Classique avec retour', bars: [[0], [3], [0], [4, 0]] },
+      { name: 'Jazz étiré', bars: [[0], [1], [4], [0]] },
+      { name: 'Classique', bars: [[0], [3], [4], [0]] },
+      { name: 'Montée par iii', bars: [[0], [2], [3], [4, 0]] },
+      { name: 'Andalouse', bars: [[0], [6], [5], [4, 0]], minor: true },
+    ],
   };
 
   const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
@@ -489,13 +529,17 @@ const Melody = (() => {
     return counts;
   }
 
-  function progressionFor(bars, rng) {
-    if (PROGS[bars]) return pick(PROGS[bars], rng).map((b) => [...b]);
+  function progressionFor(bars, rng, scale) {
+    const natMinor = scale[2] === 3 && scale[6] === 10;
+    if (PROGS[bars]) {
+      const p = pick(PROGS[bars].filter((x) => !x.minor || natMinor), rng);
+      return { prog: p.bars.map((b) => [...b]), name: p.name };
+    }
     const p = [[0]];
     const mid = [[3], [5], [1], [0]];
     while (p.length < bars - 1) p.push([...pick(mid, rng)]);
     p.push([4, 0]);
-    return p;
+    return { prog: p, name: 'Progression libre, fin V–I' };
   }
 
   /** Construit les emplacements { beat, dur, root, strong } à partir des cellules et de l'harmonie. */
@@ -518,8 +562,9 @@ const Melody = (() => {
     const last = slots.length - 1, slot = slots[i];
     const prev = seq[i - 1];
     if (i === 0) {
-      if (!isChordTone(x, 0)) return 0;
-      return [0, 2, 4].includes(x) ? (x === 0 ? 2 : 3) : 1;
+      // première note : une note de l'accord de départ (1, 3 ou 5 quand on part de I)
+      if (!isChordTone(x, slot.root)) return 0;
+      return x >= 0 && x <= 4 ? (x === 0 ? 2 : 3) : 1;
     }
     const d = x - prev, ad = Math.abs(d);
     if (ad > L.maxLeap) return 0;
@@ -587,23 +632,24 @@ const Melody = (() => {
     const scale = opts.scale || [0, 2, 4, 5, 7, 9, 11];
     const n = Math.max(3, Math.min(10, opts.count || randInt(L.count[0], L.count[1], rng)));
     for (let attempt = 0; attempt < 60; attempt++) {
-      const res = L.motif && n >= 6 ? withMotif(n, L, scale, rng) : plain(n, L, scale, rng);
+      // au niveau difficile : 6 fois sur 10 une marche harmonique, sinon une progression de la liste
+      const res = L.motif && n >= 6 && rng() < 0.6 ? withMotif(n, L, scale, rng) : plain(n, L, scale, rng);
       if (res) return finish(res, scale);
     }
     // repli très improbable : descente simple vers la tonique
     const seq = Array.from({ length: n }, (_, k) => Math.max(0, Math.min(4, n - 1 - k)));
     const cells = [Array(n).fill(4 / n)];
-    return finish({ seq, slots: buildSlots(cells, [[0]]), prog: [[0]], cells }, scale);
+    return finish({ seq, slots: buildSlots(cells, [[0]]), prog: [[0]], cells, name: 'Accord de I' }, scale);
   }
 
   function plain(n, L, scale, rng) {
     const endCount = Math.min(n - 1, randInt(1, 3, rng));
     const counts = [...splitCounts(n - endCount, rng), endCount];
     const cells = counts.map((c, k) => [...pick(k === counts.length - 1 ? END_CELLS[c] : CELLS[c], rng)]);
-    const prog = progressionFor(cells.length, rng);
+    const { prog, name } = progressionFor(cells.length, rng, scale);
     const slots = buildSlots(cells, prog);
     const seq = fillPitches(slots, L, scale, rng);
-    return seq && { seq, slots, prog, cells };
+    return seq && { seq, slots, prog, cells, name };
   }
 
   function withMotif(n, L, scale, rng) {
@@ -626,10 +672,10 @@ const Melody = (() => {
     // le passage du motif à sa copie doit respecter les règles de saut
     for (let i = c; i < 2 * c; i++) if (weight(prefix[i], i, prefix.slice(0, i), slots, { ...L, range: L.range }, scale) === 0 && i === c) return null;
     const seq = fillPitches(slots, L, scale, rng, prefix);
-    return seq && { seq, slots, prog, cells, motif: { length: c, shift } };
+    return seq && { seq, slots, prog, cells, motif: { length: c, shift }, name: `Marche harmonique (motif ${shift > 0 ? 'monté' : 'descendu'} d'${Math.abs(shift) === 1 ? 'un degré' : 'une tierce'})` };
   }
 
-  function finish({ seq, slots, prog, cells, motif }, scale) {
+  function finish({ seq, slots, prog, cells, motif, name }, scale) {
     const toSemi = (x) => 12 * Math.floor(x / 7) + scale[mod(x, 7)];
     const notes = seq.map((x, i) => ({ idx: x, semi: toSemi(x), beat: slots[i].beat, dur: slots[i].dur, root: slots[i].root }));
     const harmony = [];
@@ -637,10 +683,10 @@ const Melody = (() => {
       if (chords.length === 2) { harmony.push({ beat: b * 4, dur: 2, root: chords[0] }); harmony.push({ beat: b * 4 + 2, dur: 2, root: chords[1] }); }
       else harmony.push({ beat: b * 4, dur: 4, root: chords[0] });
     });
-    return { notes, harmony, bars: cells.length, cells, motif: motif || null };
+    return { notes, harmony, bars: cells.length, cells, prog, name: name || '', motif: motif || null };
   }
 
-  return { LEVELS, TEMPO, CELLS, END_CELLS, generate, isChordTone, mod };
+  return { LEVELS, TEMPO, CELLS, END_CELLS, PROGS, generate, isChordTone, mod };
 })();
 if (typeof module !== 'undefined') module.exports = Melody;
 
@@ -1881,6 +1927,17 @@ const Piano = (() => {
     Piano.sequence(ev, 0.5, releaseTime()).then(() => { if (S && tok === S.token) nextQuestion(false); });
   }
 
+  /** La progression d'accords cachée, mesure par mesure, aux couleurs des fonctions. */
+  function progressionHtml() {
+    const mel = S.q.mel;
+    const bars = mel.prog.map((chords) => `<span class="prog-bar">${chords.map((r) =>
+      `<span class="prog-chord" style="--c:var(--deg${r})">${esc(M.triad(S.resScale, r).name)}</span>`).join('')}</span>`).join('');
+    return `<div class="prog" aria-label="Progression utilisée">
+      <span class="eyebrow">Construite sur · ${esc(mel.name)}</span>
+      <div class="prog-bars">${bars}</div>
+    </div>`;
+  }
+
   function renderPlayMelody() {
     const s = S.set, q = S.q;
     $app.innerHTML = `
@@ -1895,6 +1952,7 @@ const Piano = (() => {
         <span class="key">${s.showKey === false ? '?' : esc(M.keyName(S.keyPc, S.mode))}</span>
         <div class="slots mel">${q.midis.map((m, k) =>
           `<span class="slot${k < q.pos ? ' done-plain' : ''}${k === q.pos && !q.solved ? ' current' : ''}">${k < q.pos ? esc(M.label(m - S.t, s.notation)) : '?'}</span>`).join('')}</div>
+        ${q.solved ? progressionHtml() : ''}
         ${statusHtml()}
       </div>
       <div class="answers${q.solved ? ' locked' : ''}">${S.notes.map((n) =>
