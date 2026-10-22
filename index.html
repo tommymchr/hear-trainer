@@ -154,7 +154,7 @@ p { margin: 0; }
 .ans.good { background: var(--good-soft); color: var(--good); border-color: var(--good); box-shadow: inset 0 -5px 0 var(--good); }
 .answers.locked .ans:not(.good) { opacity: .5; }
 
-.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
+.controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); gap: 8px; }
 .ctl {
   border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 12px 8px;
   display: flex; flex-direction: column; align-items: center; gap: 4px; font-weight: 650; font-size: .88rem;
@@ -247,6 +247,12 @@ p { margin: 0; }
 .ring-hint { font-size: .85rem; color: var(--muted); font-weight: 600; }
 .level { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; width: min(240px, 70vw); margin: 0 auto; }
 .level i { display: block; height: 100%; width: 0; background: var(--muted); transition: width .05s; }
+
+/* Dictée mélodique */
+.slots.mel { flex-wrap: nowrap; gap: 5px; width: 100%; }
+.slots.mel .slot { flex: 1 1 0; min-width: 0; max-width: 56px; padding: 7px 0; text-align: center; font-size: .95rem; }
+.slot.done-plain { border: 1px solid var(--good); background: var(--good-soft); color: var(--good); }
+.ctl[disabled] { opacity: .4; cursor: default; }
 
 </style>
 </head>
@@ -426,6 +432,217 @@ const Music = (() => {
   };
 })();
 if (typeof module !== 'undefined') module.exports = Music;
+
+/* Hear-Trainer — générateur de mélodies « qui ont du sens » (pur, sans DOM)
+ *
+ * Une note est un index de degré : 0 = tonique, 1 = 2e degré … 7 = tonique à l'octave, -1 = 7e degré en dessous.
+ * Principe :
+ *  1. un rythme en 4/4, mesure par mesure, la dernière note étant longue ;
+ *  2. une harmonie cachée (un ou deux accords par mesure, cadence V → I à la fin) ;
+ *  3. des notes tirées au sort avec des poids : degrés voisins favorisés, sauts limités puis compensés
+ *     par un retour en sens inverse, notes de l'accord sur les temps forts, début sur 1/3/5, fin sur 1 ;
+ *  4. au niveau difficile, un motif répété un degré plus haut ou plus bas (marche harmonique).
+ */
+const Melody = (() => {
+  const mod = (n, m) => ((n % m) + m) % m;
+
+  const LEVELS = {
+    easy:   { count: [3, 4], maxLeap: 1, range: [0, 4],  motif: false, name: 'Facile' },
+    medium: { count: [5, 6], maxLeap: 3, range: [-3, 7], motif: false, name: 'Moyen' },
+    hard:   { count: [7, 8], maxLeap: 7, range: [-3, 9], motif: true,  name: 'Difficile' },
+  };
+  const TEMPO = { slow: 72, medium: 96, fast: 120 };
+
+  // Cellules rythmiques d'une mesure de 4 temps, selon le nombre de notes.
+  const CELLS = {
+    1: [[4]],
+    2: [[2, 2], [3, 1]],
+    3: [[2, 1, 1], [1, 1, 2], [1.5, 0.5, 2], [2, 1.5, 0.5]],
+    4: [[1, 1, 1, 1], [1, 0.5, 0.5, 2], [1.5, 0.5, 1, 1], [2, 0.5, 0.5, 1]],
+  };
+  // Dernière mesure : la note finale est longue.
+  const END_CELLS = { 1: [[4]], 2: [[2, 2], [1, 3]], 3: [[1, 1, 2], [1.5, 0.5, 2]] };
+
+  // Harmonies cachées (racines en degrés : 0 = I, 1 = ii, 3 = IV, 4 = V, 5 = vi), un tableau par mesure.
+  const PROGS = {
+    2: [[[0], [4, 0]], [[0], [3, 0]]],
+    3: [[[0], [3], [4, 0]], [[0], [1], [4, 0]], [[0], [5], [4, 0]]],
+    4: [[[0], [5], [3], [4, 0]], [[0], [3], [0], [4, 0]], [[0], [1], [4], [0]], [[0], [3], [4], [0]]],
+  };
+
+  const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
+  const randInt = (a, b, rng) => a + Math.floor(rng() * (b - a + 1));
+  const isChordTone = (x, root) => [0, 2, 4].includes(mod(x - root, 7));
+
+  /** Découpe n notes (hors dernière mesure) en mesures de 1 à 4 notes. */
+  function splitCounts(n, rng) {
+    if (n <= 0) return [];
+    const minBars = Math.ceil(n / 4), maxBars = Math.max(minBars, Math.floor(n / 2));
+    const bars = randInt(minBars, maxBars, rng);
+    const counts = Array(bars).fill(Math.floor(n / bars));
+    for (let k = 0; k < n % bars; k++) counts[k]++;
+    // petite variation : échanger une note entre deux mesures voisines
+    if (bars > 1 && rng() < 0.5) {
+      const a = randInt(0, bars - 2, rng);
+      if (counts[a] > 2 && counts[a + 1] < 4) { counts[a]--; counts[a + 1]++; }
+    }
+    return counts;
+  }
+
+  function progressionFor(bars, rng) {
+    if (PROGS[bars]) return pick(PROGS[bars], rng).map((b) => [...b]);
+    const p = [[0]];
+    const mid = [[3], [5], [1], [0]];
+    while (p.length < bars - 1) p.push([...pick(mid, rng)]);
+    p.push([4, 0]);
+    return p;
+  }
+
+  /** Construit les emplacements { beat, dur, root, strong } à partir des cellules et de l'harmonie. */
+  function buildSlots(cells, prog) {
+    const slots = [];
+    cells.forEach((cell, b) => {
+      let t = 0;
+      cell.forEach((d) => {
+        const chords = prog[b];
+        const root = chords.length === 2 && t >= 2 ? chords[1] : chords[0];
+        slots.push({ beat: b * 4 + t, dur: d, root, strong: t === 0 || t === 2 });
+        t += d;
+      });
+    });
+    return slots;
+  }
+
+  /** Poids d'une note candidate x à la position i (0 = interdite). */
+  function weight(x, i, seq, slots, L, scale) {
+    const last = slots.length - 1, slot = slots[i];
+    const prev = seq[i - 1];
+    if (i === 0) {
+      if (!isChordTone(x, 0)) return 0;
+      return [0, 2, 4].includes(x) ? (x === 0 ? 2 : 3) : 1;
+    }
+    const d = x - prev, ad = Math.abs(d);
+    if (ad > L.maxLeap) return 0;
+    // un saut de plus d'une tierce doit être suivi d'un pas en sens inverse
+    if (i >= 2) {
+      const pl = seq[i - 1] - seq[i - 2];
+      if (Math.abs(pl) >= 3 && !(ad === 1 && Math.sign(d) === -Math.sign(pl))) return 0;
+    }
+    // sensible (7e degré à un demi-ton de la tonique) : elle monte vers la tonique
+    if (mod(prev, 7) === 6 && scale[6] === 11 && d !== 1) return 0;
+    // pas de triton mélodique 4 ↔ 7
+    if (ad === 3 && ((mod(prev, 7) === 3 && mod(x, 7) === 6) || (mod(prev, 7) === 6 && mod(x, 7) === 3))) return 0;
+    // pas trois fois la même note
+    if (d === 0 && i >= 2 && seq[i - 1] === seq[i - 2]) return 0;
+    if (i === last) {
+      if (mod(x, 7) !== 0) return 0;
+      return ad <= 1 ? 6 : ad <= 4 ? 2 : 0.5;
+    }
+    if (i === last - 1) {
+      // l'avant-dernière note doit pouvoir rejoindre une tonique dans la tessiture
+      const ok = [0, 7, -7].some((tn) => tn >= L.range[0] && tn <= L.range[1] && Math.abs(tn - x) <= Math.min(L.maxLeap, 4) && tn !== x);
+      if (!ok) return 0;
+    }
+    let w = ad === 0 ? 0.35 : ad === 1 ? 9 : ad === 2 ? 3 : ad === 3 ? 1.2 : ad === 4 ? 0.9 : 0.4;
+    if (slot.strong) w *= isChordTone(x, slot.root) ? 3 : 0.35;
+    // après une tierce, préférer revenir en arrière
+    if (i >= 2) {
+      const pl = seq[i - 1] - seq[i - 2];
+      if (Math.abs(pl) === 2 && Math.sign(d) === -Math.sign(pl)) w *= 1.6;
+    }
+    return w;
+  }
+
+  /** Tire les hauteurs pour les emplacements, en gardant le début `prefix` déjà fixé. */
+  function fillPitches(slots, L, scale, rng, prefix = []) {
+    for (let attempt = 0; attempt < 400; attempt++) {
+      const seq = [...prefix];
+      let ok = true;
+      for (let i = prefix.length; i < slots.length; i++) {
+        const cands = [];
+        let total = 0;
+        for (let x = L.range[0]; x <= L.range[1]; x++) {
+          const w = weight(x, i, seq, slots, L, scale);
+          if (w > 0) { cands.push([x, w]); total += w; }
+        }
+        if (!cands.length) { ok = false; break; }
+        let r = rng() * total;
+        let chosen = cands[cands.length - 1][0];
+        for (const [x, w] of cands) { r -= w; if (r <= 0) { chosen = x; break; } }
+        seq.push(chosen);
+      }
+      if (ok && validShape(seq)) return seq;
+    }
+    return null;
+  }
+
+  /** Évite les mélodies trop plates (une seule note répétée, ou deux notes en ping-pong). */
+  function validShape(seq) {
+    if (seq.length >= 4 && new Set(seq).size < 3) return false;
+    return true;
+  }
+
+  function generate(opts = {}, rng = Math.random) {
+    const L = LEVELS[opts.level] || LEVELS.medium;
+    const scale = opts.scale || [0, 2, 4, 5, 7, 9, 11];
+    const n = Math.max(3, Math.min(10, opts.count || randInt(L.count[0], L.count[1], rng)));
+    for (let attempt = 0; attempt < 60; attempt++) {
+      const res = L.motif && n >= 6 ? withMotif(n, L, scale, rng) : plain(n, L, scale, rng);
+      if (res) return finish(res, scale);
+    }
+    // repli très improbable : descente simple vers la tonique
+    const seq = Array.from({ length: n }, (_, k) => Math.max(0, Math.min(4, n - 1 - k)));
+    const cells = [Array(n).fill(4 / n)];
+    return finish({ seq, slots: buildSlots(cells, [[0]]), prog: [[0]], cells }, scale);
+  }
+
+  function plain(n, L, scale, rng) {
+    const endCount = Math.min(n - 1, randInt(1, 3, rng));
+    const counts = [...splitCounts(n - endCount, rng), endCount];
+    const cells = counts.map((c, k) => [...pick(k === counts.length - 1 ? END_CELLS[c] : CELLS[c], rng)]);
+    const prog = progressionFor(cells.length, rng);
+    const slots = buildSlots(cells, prog);
+    const seq = fillPitches(slots, L, scale, rng);
+    return seq && { seq, slots, prog, cells };
+  }
+
+  function withMotif(n, L, scale, rng) {
+    const c = Math.min(4, Math.floor((n - 1) / 2));
+    const rest = n - 2 * c;
+    if (!END_CELLS[rest]) return null;
+    const cell = pick(CELLS[c], rng);
+    const shift = pick([1, -1, 2, -2], rng);
+    const cells = [[...cell], [...cell], [...pick(END_CELLS[rest], rng)]];
+    const prog = [[0], [mod(shift, 7)], [4, 0]];
+    const slots = buildSlots(cells, prog);
+    // motif sur l'accord de I, sans contrainte de fin
+    const motifSlots = slots.slice(0, c);
+    const motif = fillPitches(motifSlots.concat([{ ...motifSlots[0], strong: false }]), { ...L, maxLeap: Math.min(L.maxLeap, 4) }, scale, rng);
+    if (!motif) return null;
+    const m = motif.slice(0, c);
+    const moved = m.map((x) => x + shift);
+    if (moved.some((x) => x < L.range[0] || x > L.range[1])) return null;
+    const prefix = [...m, ...moved];
+    // le passage du motif à sa copie doit respecter les règles de saut
+    for (let i = c; i < 2 * c; i++) if (weight(prefix[i], i, prefix.slice(0, i), slots, { ...L, range: L.range }, scale) === 0 && i === c) return null;
+    const seq = fillPitches(slots, L, scale, rng, prefix);
+    return seq && { seq, slots, prog, cells, motif: { length: c, shift } };
+  }
+
+  function finish({ seq, slots, prog, cells, motif }, scale) {
+    const toSemi = (x) => 12 * Math.floor(x / 7) + scale[mod(x, 7)];
+    const notes = seq.map((x, i) => ({ idx: x, semi: toSemi(x), beat: slots[i].beat, dur: slots[i].dur, root: slots[i].root }));
+    const harmony = [];
+    prog.forEach((chords, b) => {
+      if (chords.length === 2) { harmony.push({ beat: b * 4, dur: 2, root: chords[0] }); harmony.push({ beat: b * 4 + 2, dur: 2, root: chords[1] }); }
+      else harmony.push({ beat: b * 4, dur: 4, root: chords[0] });
+    });
+    return { notes, harmony, bars: cells.length, cells, motif: motif || null };
+  }
+
+  return { LEVELS, TEMPO, CELLS, END_CELLS, generate, isChordTone, mod };
+})();
+if (typeof module !== 'undefined') module.exports = Melody;
 
 /* Hear-Trainer — détection de hauteur (algorithme YIN), sans DOM */
 const Pitch = (() => {
@@ -611,13 +828,21 @@ const Piano = (() => {
     instrument: 'guitar', guitarRange: '12', context: 'none', pool: 'all', mode: 'major',
     tonalite: 'random-not-c', changeKey: 'exercise', octaveExact: false, hold: 2, questions: 20, articulation: 'legato',
   };
+  const MEL_DEFAULTS = {
+    scale: 'major', level: 'medium', count: 'auto', tempo: 'medium', accomp: false,
+    tonalite: 'random-not-c', changeKey: 'exercise', showKey: true, cadenceEach: true, notation: 'degres',
+    articulation: 'legato', questions: 10, help: true,
+  };
+  const MEL_BUILTIN = [
+    { id: 'mel', type: 'melody', glyph: '♫', title: 'Dictée mélodique', sub: 'Cadence, puis une courte mélodie à retrouver note par note' },
+  ];
   const INST_BUILTIN = [
     { id: 'inst', type: 'instrument', glyph: '♪', title: 'Instrument + micro', sub: 'Une note est jouée : retrouve-la sur ta guitare ou ton mélodica' },
   ];
 
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const savedList = () => Store.get('saved', []);
-  const findEx = (id) => BUILTIN.find((e) => e.id === id) || CHORD_BUILTIN.find((e) => e.id === id) || INST_BUILTIN.find((e) => e.id === id) || savedList().find((e) => e.id === id);
+  const findEx = (id) => BUILTIN.find((e) => e.id === id) || CHORD_BUILTIN.find((e) => e.id === id) || INST_BUILTIN.find((e) => e.id === id) || MEL_BUILTIN.find((e) => e.id === id) || savedList().find((e) => e.id === id);
   const isChords = (ex) => ex && ex.type === 'chords';
 
   /** Gamme de référence pour la résolution : celle du mode, ajustée aux altérations choisies. */
@@ -678,6 +903,10 @@ const Piano = (() => {
       ${saved.length ? `<section class="section"><span class="eyebrow">Mes exercices</span>
         <div class="cards">${saved.map((e) => card({ ...e, glyph: '★', sub: summary(e) })).join('')}</div></section>` : ''}
       <section class="section">
+        <span class="eyebrow">Mélodies</span>
+        <div class="cards">${MEL_BUILTIN.map((e) => card(e)).join('')}</div>
+      </section>
+      <section class="section">
         <span class="eyebrow">Avec ton instrument</span>
         <div class="cards">${INST_BUILTIN.map((e) => card(e)).join('')}</div>
       </section>
@@ -705,6 +934,11 @@ const Piano = (() => {
   function openSetup(id) {
     const ex = findEx(id);
     if (!ex) return renderHome();
+    if (ex.type === 'melody') {
+      draft = { ex, settings: { ...MEL_DEFAULTS, ...Store.get('settings:' + id, {}) } };
+      screen = 'setup'; pushScreen();
+      return renderSetup();
+    }
     if (ex.type === 'instrument') {
       draft = { ex, settings: { ...INST_DEFAULTS, ...Store.get('settings:' + id, {}) } };
       screen = 'setup'; pushScreen();
@@ -741,6 +975,7 @@ const Piano = (() => {
   function renderSetup() {
     if (isChords(draft.ex)) return renderSetupChords();
     if (draft.ex.type === 'instrument') return renderSetupInstrument();
+    if (draft.ex.type === 'melody') return renderSetupMelody();
     const { ex, settings: s } = draft;
     const editable = ex.custom || ex.saved;
     const presets = [['major', 'Majeur'], ['minor', 'Mineur nat.'], ['harmonic', 'Mineur harm.'], ['melodic', 'Mineur mél.'], ['all', 'Les 12'], ['none', 'Aucune']];
@@ -799,10 +1034,12 @@ const Piano = (() => {
   function setSetting(k, v) {
     const s = draft.settings;
     if (k === 'mode' && draft.ex.type !== 'instrument') draft.mode = v;
+    else if (k === 'scale' && draft.ex.type === 'melody') s.scale = v;
     else if (k === 'scale') draft.scale = v;
     else if (k === 'mode' && draft.ex.type === 'instrument') s.mode = v;
     else if (k === 'octaves' || k === 'questions' || k === 'seqLength' || k === 'hold') s[k] = Number(v);
-    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey') s[k] = v === 'true';
+    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp') s[k] = v === 'true';
+    else if (k === 'count') s[k] = v === 'auto' ? 'auto' : Number(v);
     else s[k] = v;
     persistDraft(); renderSetup();
   }
@@ -845,6 +1082,7 @@ const Piano = (() => {
   async function startSession() {
     if (isChords(draft.ex)) return startChordSession();
     if (draft.ex.type === 'instrument') return startInstrumentSession();
+    if (draft.ex.type === 'melody') return startMelodySession();
     const { ex, settings } = draft;
     if (ex.saved) { // garder les derniers réglages de l'exercice enregistré
       const list = savedList(); const i = list.findIndex((e) => e.id === ex.id);
@@ -871,6 +1109,7 @@ const Piano = (() => {
     if (S.i >= S.n) return finish();
     if (S.type === 'chords') return nextChordQuestion(first);
     if (S.type === 'instrument') return nextInstrumentQuestion(first);
+    if (S.type === 'melody') return nextMelodyQuestion(first);
     let keyChanged = !!first;
     if (!first && S.set.changeKey === 'question' && S.set.tonalite !== 'do') {
       S.keyPc = M.pickKey(S.set.tonalite, S.keyPc); keyChanged = true;
@@ -905,10 +1144,11 @@ const Piano = (() => {
     let ev = [], at = 0;
     if (withCadence) ({ ev, end: at } = cadenceEvents());
     if (!onlyCadence && S.type === 'chords') ev.push(...chordEvents(S.q.voiced, at).ev);
+    else if (!onlyCadence && S.type === 'melody') ev.push(...melodyEvents(0, at, S.set.accomp).ev);
     else if (!onlyCadence) ev.push({ at, midis: [S.q.midi], dur: 1.3, vel: 0.95 });
     await Piano.sequence(ev, 0, releaseTime());
     if (!S || tok !== S.token) return;
-    if (!S.q.solved) setStatus(S.type === 'chords' ? chordPrompt() : S.q.wrong.size ? 'Pas encore — essaie une autre note.' : 'Quelle est cette note ?');
+    if (!S.q.solved) setStatus(S.type === 'chords' ? chordPrompt() : S.type === 'melody' ? melodyPrompt() : S.q.wrong.size ? 'Pas encore — essaie une autre note.' : 'Quelle est cette note ?');
   }
 
   function replayNote() {
@@ -975,6 +1215,7 @@ const Piano = (() => {
   /* ---------- Rendu de la séance ---------- */
   function renderPlay() {
     if (S.type === 'chords') return renderPlayChords();
+    if (S.type === 'melody') return renderPlayMelody();
     const s = S.set;
     $app.innerHTML = `
       <header class="top">
@@ -1500,6 +1741,174 @@ const Piano = (() => {
     renderReveal(); updateRing();
   }
 
+  /* ---------- Dictée mélodique ---------- */
+  function renderSetupMelody() {
+    const { ex, settings: s } = draft;
+    $app.innerHTML = `
+      <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
+      <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Gamme</span>
+          ${seg('scale', SCALE_OPTS, s.scale)}
+          <p class="hint">Cadence jouée : ${M.cadence(M.SCALES[s.scale].notes).map((c) => c.name).join('–')}</p></div>
+        <div class="setting"><span class="lbl">Niveau</span>
+          ${seg('level', [['easy', 'Facile'], ['medium', 'Moyen'], ['hard', 'Difficile']], s.level)}
+          <p class="hint">${{ easy: '3–4 notes, uniquement des degrés voisins, entre 1 et 5.', medium: '5–6 notes, petits sauts (tierces, quartes) sur une octave.', hard: '7–8 notes, sauts jusqu\'à l\'octave, un motif répété plus haut ou plus bas.' }[s.level]}</p></div>
+        <div class="setting"><span class="lbl">Nombre de notes</span>
+          ${seg('count', [['auto', 'Selon le niveau'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [7, '7'], [8, '8']], s.count)}</div>
+        <div class="setting"><span class="lbl">Tempo</span>
+          ${seg('tempo', [['slow', 'Lent'], ['medium', 'Moyen'], ['fast', 'Rapide']], s.tempo)}</div>
+        <div class="setting"><span class="lbl">Accompagnement</span>
+          ${seg('accomp', [['false', 'Mélodie seule'], ['true', 'Avec les accords cachés']], s.accomp)}
+          <p class="hint">Après chaque bonne réponse, la mélodie est toujours rejouée avec ses accords.</p></div>
+      </div>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Tonalité</span>
+          ${seg('tonalite', [['do', 'Do'], ['random-not-c', 'Aléatoire sauf Do'], ['random', 'Aléatoire']], s.tonalite)}</div>
+        ${s.tonalite !== 'do' ? `<div class="setting"><span class="lbl">Changer de tonalité</span>
+          ${seg('changeKey', [['exercise', 'Une pour toute la série'], ['question', 'À chaque question']], s.changeKey)}</div>` : ''}
+        <div class="setting"><span class="lbl">Afficher la tonalité</span>
+          ${seg('showKey', [['true', 'Oui'], ['false', 'Non']], s.showKey)}</div>
+        <div class="setting"><span class="lbl">Cadence</span>
+          ${seg('cadenceEach', [['true', 'Avant chaque question'], ['false', 'Seulement au changement de tonalité']], s.cadenceEach)}</div>
+        <div class="setting"><span class="lbl">Noms des réponses</span>
+          ${seg('notation', [['degres', 'Degrés (1, 2, ♭3…)'], ['solfege', 'Solfège mobile (do, ré, mi…)']], s.notation)}</div>
+        <div class="setting"><span class="lbl">Jeu du piano</span>
+          ${seg('articulation', [['legato', 'Lié (legato)'], ['staccato', 'Détaché (staccato)']], s.articulation)}</div>
+        <div class="setting"><label for="q-num">Nombre de questions</label>
+          <div class="row-gap">${seg('questions', [10, 20, 30].map((n) => [n, n]), s.questions)}
+          <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
+        <div class="setting"><span class="lbl">Clavier d'aide</span>
+          ${seg('help', [['true', 'Disponible'], ['false', 'Désactivé']], s.help)}
+          <p class="hint">Utiliser le clavier pendant une question la compte comme ratée.</p></div>
+      </div>
+      <button class="btn wide" data-act="start">Commencer</button>`;
+  }
+
+  async function startMelodySession() {
+    const s = { ...draft.settings };
+    const scaleNotes = M.SCALES[s.scale].notes;
+    S = {
+      type: 'melody', title: 'Dictée · ' + M.SCALES[s.scale].name.toLowerCase(),
+      set: s, mode: M.SCALES[s.scale].mode, resScale: scaleNotes, notes: scaleNotes,
+      n: Math.max(1, Math.min(200, s.questions || 10)),
+      i: 0, firstTry: 0, missed: {}, token: 0, keyPc: null, kbdOpen: false,
+    };
+    screen = 'play'; pushScreen();
+    $app.innerHTML = '<div class="loading">Chargement du piano…</div>';
+    await Piano.unlock();
+    if (!S) return;
+    S.keyPc = M.pickKey(s.tonalite, null);
+    nextQuestion(true);
+  }
+
+  function nextMelodyQuestion(first) {
+    let keyChanged = !!first;
+    if (!first && S.set.changeKey === 'question' && S.set.tonalite !== 'do') {
+      S.keyPc = M.pickKey(S.set.tonalite, S.keyPc); keyChanged = true;
+    }
+    S.t = M.tonicMidi(S.keyPc);
+    const mel = Melody.generate({ level: S.set.level, scale: S.resScale, count: S.set.count === 'auto' ? undefined : Number(S.set.count) });
+    S.q = { mel, midis: mel.notes.map((n) => S.t + n.semi), pos: 0, wrong: new Set(), anyWrong: false, solved: false, helped: false };
+    S.i++; S.lastStatus = null;
+    renderPlayMelody();
+    playQuestion(S.set.cadenceEach || keyChanged);
+  }
+
+  /** Événements sonores de la mélodie (à partir de la note `from`), avec les accords cachés si `acc`. */
+  function melodyEvents(from = 0, startAt = 0, acc = false) {
+    const notes = S.q.mel.notes, beat = 60 / Melody.TEMPO[S.set.tempo || 'medium'];
+    const L = S.set.articulation !== 'staccato';
+    const b0 = notes[from].beat;
+    const ev = [];
+    notes.slice(from).forEach((n, k) => {
+      const last = from + k === notes.length - 1;
+      const len = n.dur * beat;
+      ev.push({ at: startAt + (n.beat - b0) * beat, midis: [S.q.midis[from + k]], dur: last ? Math.max(len, 1) : L ? len * 0.98 : Math.min(len * 0.5, 0.35), vel: 0.92 });
+    });
+    if (acc) {
+      const triads = S.q.mel.harmony.map((h) => M.triad(S.resScale, h.root));
+      const voiced = M.voiceProgression(S.t, triads);
+      S.q.mel.harmony.forEach((h, k) => {
+        if (h.beat + h.dur <= b0) return;
+        const at = startAt + Math.max(0, h.beat - b0) * beat;
+        const dur = (h.beat + h.dur - Math.max(h.beat, b0)) * beat * 0.97;
+        ev.push({ at, midis: [voiced[k].bass - 12], dur, vel: 0.3 });
+        ev.push({ at, midis: voiced[k].upper.map((m) => m - 12), dur, vel: 0.2 });
+      });
+    }
+    let end = startAt;
+    ev.forEach((e) => { end = Math.max(end, e.at + e.dur); });
+    return { ev, end };
+  }
+
+  function melodyPrompt() {
+    const q = S.q;
+    return q.wrong.size ? 'Pas ça — réessaie.' : `Note ${q.pos + 1} sur ${q.midis.length} : laquelle ?`;
+  }
+
+  function replayMelody(from = 0) {
+    const tok = ++S.token; Piano.stopAll();
+    Piano.sequence(melodyEvents(from, 0, from === 0 && S.set.accomp).ev, 0, releaseTime())
+      .then(() => { if (S && tok === S.token && !S.q.solved) setStatus(melodyPrompt(), S.q.wrong.size ? 'bad' : ''); });
+  }
+
+  function answerMelody(semi) {
+    const q = S.q;
+    if (!q || q.solved) return;
+    const target = M.mod(q.midis[q.pos] - S.t, 12);
+    const btn = $app.querySelector(`.ans[data-v="${semi}"]`);
+    if (semi !== target) {
+      if (!q.wrong.size) S.missed[target] = (S.missed[target] || 0) + 1;
+      q.wrong.add(semi); q.anyWrong = true;
+      btn && btn.classList.add('bad');
+      setStatus('Pas ça — réessaie.', 'bad');
+      return;
+    }
+    q.pos++; q.wrong = new Set();
+    if (q.pos < q.midis.length) {
+      renderPlayMelody();
+      setStatus(melodyPrompt());
+      return;
+    }
+    q.solved = true;
+    const clean = !q.anyWrong && !q.helped;
+    if (clean) S.firstTry++;
+    renderPlayMelody();
+    setStatus(clean ? 'Bravo ! Écoute-la avec ses accords.' : 'Trouvé. Écoute-la avec ses accords.', 'good');
+    const tok = ++S.token; Piano.stopAll();
+    const { ev } = melodyEvents(0, 0.2, true);
+    Piano.sequence(ev, 0.5, releaseTime()).then(() => { if (S && tok === S.token) nextQuestion(false); });
+  }
+
+  function renderPlayMelody() {
+    const s = S.set, q = S.q;
+    $app.innerHTML = `
+      <header class="top">
+        <button class="link-btn" data-act="home">‹ Quitter</button>
+        <span class="eyebrow">Question ${S.i} / ${S.n}</span>
+        <span class="score" id="score">✓ ${S.firstTry}</span>
+      </header>
+      <div class="progress"><i style="width:${((S.i - 1) / S.n) * 100}%"></i></div>
+      <div class="stage">
+        <span class="eyebrow">${esc(S.title)} · ${esc(Melody.LEVELS[s.level].name.toLowerCase())}</span>
+        <span class="key">${s.showKey === false ? '?' : esc(M.keyName(S.keyPc, S.mode))}</span>
+        <div class="slots mel">${q.midis.map((m, k) =>
+          `<span class="slot${k < q.pos ? ' done-plain' : ''}${k === q.pos && !q.solved ? ' current' : ''}">${k < q.pos ? esc(M.label(m - S.t, s.notation)) : '?'}</span>`).join('')}</div>
+        ${statusHtml()}
+      </div>
+      <div class="answers${q.solved ? ' locked' : ''}">${S.notes.map((n) =>
+        `<button class="ans${M.isAltered(n) ? ' alt' : ''}" data-act="answer-mel" data-v="${n}">${esc(M.label(n, s.notation))}</button>`).join('')}</div>
+      <div class="controls">
+        <button class="ctl" data-act="replay-cadence">${ICON.cadence}Cadence</button>
+        <button class="ctl" data-act="mel-replay">${ICON.note}Mélodie</button>
+        <button class="ctl" data-act="mel-from" ${q.pos === 0 || q.solved ? 'disabled' : ''}>${ICON.skip}Depuis ici</button>
+        ${s.help ? `<button class="ctl" data-act="mel-kbd" aria-pressed="${S.kbdOpen}">${ICON.kbd}Clavier</button>` : ''}
+      </div>
+      ${s.help && S.kbdOpen ? renderKeyboard() : ''}`;
+    q.wrong.forEach((w) => $app.querySelector(`.ans[data-v="${w}"]`)?.classList.add('bad'));
+  }
+
   /* ---------- Événements ---------- */
   $app.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
@@ -1523,6 +1932,13 @@ const Piano = (() => {
       case 'inst-replay': playInstrumentQuestion(false); break;
       case 'inst-reveal': revealNote(); break;
       case 'inst-skip': skipInstrument(); break;
+      case 'answer-mel': answerMelody(Number(v)); break;
+      case 'mel-replay': replayMelody(0); break;
+      case 'mel-from': replayMelody(S.q.pos); break;
+      case 'mel-kbd':
+        S.kbdOpen = !S.kbdOpen;
+        if (S.kbdOpen && !S.q.solved) S.q.helped = true;
+        renderPlayMelody(); break;
       case 'replay-chords': replayChords(); break;
       case 'chord-help':
         S.kbdOpen = !S.kbdOpen;
