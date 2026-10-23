@@ -321,6 +321,102 @@ p { margin: 0; }
 .grid-rows { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
 .grid-rows .prog-bars { justify-content: flex-start; }
 
+/* ---------- Accueil à onglets ---------- */
+.home { display: flex; flex-direction: column; gap: 18px; padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+.tab-title { font-size: 1.6rem; }
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: flex; justify-content: center;
+  background: color-mix(in srgb, var(--surface) 92%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--line); padding: 6px max(8px, env(safe-area-inset-left, 0px)) calc(6px + env(safe-area-inset-bottom, 0px));
+}
+.tabbar button {
+  flex: 1; max-width: 140px; background: none; border: 0; padding: 6px 2px; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: .72rem; font-weight: 700; color: var(--muted);
+}
+.tabbar svg { width: 22px; height: 22px; }
+.tabbar button[aria-pressed="true"] { color: var(--accent); }
+.tabbar button[aria-current="page"]:not([aria-pressed="true"]) { color: var(--ink); }
+
+.resume {
+  border: 0; border-radius: var(--radius); padding: 14px 16px; background: var(--ink); color: var(--bg);
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; text-align: left;
+}
+.resume small { display: block; opacity: .7; font-size: .78rem; font-weight: 600; }
+.resume b { font-size: 1.02rem; }
+.resume .play { width: 38px; height: 38px; flex: none; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: .85rem; }
+
+.card .glyph.tinted { background: color-mix(in srgb, var(--c) 16%, var(--surface)); color: var(--c); box-shadow: inset 0 -3px 0 var(--c); }
+
+.week-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; height: 120px; }
+.wday { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; min-width: 0; }
+.wday i { display: block; width: 100%; max-width: 30px; min-height: 3px; border-radius: 5px 5px 2px 2px; background: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.wday.today i { background: var(--accent); }
+.wmin { font-size: .7rem; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1em; }
+.wlbl { font-size: .74rem; font-weight: 700; color: var(--muted); }
+.wday.today .wlbl { color: var(--ink); }
+
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile {
+  --on: #fff;
+  border: 0; border-radius: var(--radius); padding: 14px; min-height: 112px; text-align: left;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
+  background: var(--c); color: var(--on); box-shadow: var(--shadow); transition: transform .08s;
+}
+.tile:active, .card:active, .step-card:active { transform: scale(.98); }
+.tile-g { font-family: var(--font-display); font-weight: 800; font-size: 1.6rem; line-height: 1; }
+.tile b { display: block; font-size: 1rem; }
+.tile small { display: block; font-size: .78rem; opacity: .85; font-weight: 600; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tile { --on: #11141a; } }
+:root[data-theme="dark"] .tile { --on: #11141a; }
+
+.cat-head { display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: var(--radius); background: color-mix(in srgb, var(--c) 14%, var(--surface)); border: 1px solid color-mix(in srgb, var(--c) 40%, var(--line)); box-shadow: inset 4px 0 0 var(--c); }
+.cat-head h1 { font-size: 1.6rem; }
+.cat-head p { color: var(--muted); font-size: .92rem; }
+
+.path { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.step { display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: start; padding-bottom: 14px; position: relative; }
+.step:not(:last-child)::before { content: ""; position: absolute; left: 19px; top: 42px; bottom: 2px; width: 2px; background: var(--line); }
+.step-dot { width: 40px; height: 40px; border-radius: 50%; background: var(--c); color: var(--surface); display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; font-size: 1.1rem; }
+.step-card { width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; box-shadow: var(--shadow); transition: transform .08s; }
+.step-card b { font-size: 1rem; }
+.step-card .s { color: var(--muted); font-size: .86rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.chips span { font-size: .74rem; font-weight: 700; padding: 3px 9px; border-radius: 99px; background: color-mix(in srgb, var(--c) 15%, var(--surface)); }
+
+.prog-row { display: flex; flex-direction: column; gap: 6px; }
+.prog-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.prog-pct { font-family: var(--font-display); font-weight: 800; font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.meter { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--c); border-radius: 99px; }
+.trend { font-weight: 700; color: var(--muted); white-space: nowrap; }
+.trend.up { color: var(--good); }
+.trend.down { color: var(--bad); }
+
+/* ---------- Boucle d'accords ---------- */
+.loop-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.loop-list button { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 9px 11px; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.loop-list button b { font-size: .88rem; }
+.loop-list button span { font-size: .74rem; color: var(--muted); font-weight: 600; }
+.loop-list button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.loop-list button[aria-pressed="true"] span { color: var(--bg); opacity: .75; }
+.loop-list button:first-child { grid-column: 1 / -1; }
+.loop-now {
+  border: 2px solid var(--c); border-radius: 20px; padding: 18px 16px; width: 100%;
+  background: color-mix(in srgb, var(--c) 14%, var(--surface)); box-shadow: inset 0 -8px 0 var(--c);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; color: var(--ink);
+}
+.loop-roman { font-family: var(--font-display); font-weight: 800; font-size: 3.4rem; line-height: 1; }
+.loop-name { font-weight: 700; font-size: 1.1rem; color: var(--muted); }
+.loop-tones { font-family: var(--font-display); font-weight: 750; font-size: 1.5rem; letter-spacing: .02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.loop-next { display: flex; align-items: baseline; justify-content: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px; border-radius: 12px; border: 1px dashed color-mix(in srgb, var(--c) 50%, var(--line)); }
+.loop-next b { font-family: var(--font-display); font-size: 1.2rem; color: var(--ink); }
+.loop-grid { justify-content: center; }
+.prog-chord.on { outline: 3px solid var(--ink); outline-offset: 1px; }
+.loop-nav { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; align-items: center; text-align: center; }
+.loop-nav .ctl { font-size: 1.6rem; font-weight: 800; padding: 8px 0; line-height: 1; }
+.loop-nav b { display: block; font-size: 1rem; }
+
 </style>
 </head>
 <body>
@@ -567,6 +663,28 @@ const Melody = (() => {
       { name: 'Andalouse', bars: [[0], [6], [5], [4, 0]], minor: true },
     ],
   };
+
+
+  /**
+   * Boucles d'accords pour « Boucle d'accords » : les mêmes progressions nommées que PROGS,
+   * mises à plat (un accord par case) pour tourner en boucle. minor = seulement en mineur.
+   */
+  const LOOPS = [
+    { name: 'Cadence parfaite', chords: [0, 4] },
+    { name: 'Cadence plagale', chords: [0, 3] },
+    { name: 'Classique', chords: [0, 3, 4, 0] },
+    { name: 'Classique avec retour', chords: [0, 3, 0, 4] },
+    { name: 'Préparation par ii', chords: [0, 1, 4, 0] },
+    { name: 'Jazz', chords: [1, 4, 0, 0] },
+    { name: 'Détour par vi', chords: [0, 5, 4, 0] },
+    { name: 'Années 50', chords: [0, 5, 3, 4] },
+    { name: 'Turnaround des années 50', chords: [0, 5, 1, 4] },
+    { name: 'Pop', chords: [0, 4, 5, 3] },
+    { name: 'Pop, départ sur vi', chords: [5, 3, 0, 4] },
+    { name: 'Montée par iii', chords: [0, 2, 3, 4] },
+    { name: 'Rock éolien', chords: [0, 5, 6, 0], minor: true },
+    { name: 'Andalouse', chords: [0, 6, 5, 4], minor: true },
+  ];
 
   const pick = (arr, rng) => arr[Math.floor(rng() * arr.length)];
   const randInt = (a, b, rng) => a + Math.floor(rng() * (b - a + 1));
@@ -886,7 +1004,7 @@ const Melody = (() => {
     });
   }
 
-  return { LEVELS, TEMPO, CELLS, END_CELLS, PROGS, ROLES, generate, generateQuestion, generateDialogue, DIALOGUE_GRIDS, analyze, isChordTone, mod };
+  return { LOOPS, LEVELS, TEMPO, CELLS, END_CELLS, PROGS, ROLES, generate, generateQuestion, generateDialogue, DIALOGUE_GRIDS, analyze, isChordTone, mod };
 })();
 if (typeof module !== 'undefined') module.exports = Melody;
 
@@ -1078,6 +1196,7 @@ const Piano = (() => {
   const IMPROV_BUILTIN = [
     { id: 'improv', type: 'improv', glyph: '⇄', title: 'Question-réponse', sub: 'L\'app lance une phrase en suspens, tu improvises la réponse à ton instrument' },
     // Version d'essai : à supprimer (cette ligne suffit) si elle n'est pas retenue.
+    { id: 'loop', type: 'loop', glyph: '↻', title: 'Boucle d\'accords', sub: 'Une boucle d\'accords joue en continu : improvise par-dessus (backing track)' },
     { id: 'improv2', type: 'improv', variant: 'v2', glyph: '⇄²', title: 'Question-réponse v2 (essai)', sub: 'Deux modes : cadence seule, ou grille d\'accords commune à la question et à ta réponse' },
   ];
   const SING_DEFAULTS = {
@@ -1086,7 +1205,8 @@ const Piano = (() => {
     articulation: 'legato', questions: 10,
   };
   const SING_BUILTIN = [
-    { id: 'sing', type: 'sing', glyph: '♩', title: 'Chanter le degré', sub: 'Un degré s\'affiche après la cadence : imagine-le, puis chante-le' },
+    { id: 'sing', type: 'sing', glyph: '♩', title: 'Chanter le degré', sub: 'Un degré s\'affiche après la cadence : imagine-le, puis chante-le', fixed: { singMode: 'imagine' } },
+    { id: 'sing-repeat', type: 'sing', glyph: '♩♩', title: 'Répéter la note', sub: 'L\'app joue une note après la cadence : tu la répètes en chantant', fixed: { singMode: 'repeat' } },
   ];
   const INST_DEFAULTS = {
     instrument: 'guitar', guitarRange: '12', context: 'none', pool: 'all', mode: 'major',
@@ -1099,12 +1219,18 @@ const Piano = (() => {
     answerMode: 'buttons', instrument: 'guitar', guitarRange: '12', octaveExact: false, stability: 'normal',
   };
   const MEL_BUILTIN = [
-    { id: 'mel', type: 'melody', glyph: '♫', title: 'Dictée mélodique', sub: 'Cadence, puis une courte mélodie à retrouver note par note' },
+    { id: 'mel', type: 'melody', glyph: '♫', title: 'Dictée mélodique', sub: 'Une courte mélodie à retrouver note par note, avec les boutons', fixed: { answerMode: 'buttons' } },
+    { id: 'mel-inst', type: 'melody', glyph: '♫♪', title: 'Dictée à l\'instrument', sub: 'Une courte mélodie à rejouer sur ta guitare ou ton mélodica (micro)', fixed: { answerMode: 'instrument' } },
   ];
   const INST_BUILTIN = [
     { id: 'inst', type: 'instrument', glyph: '♪', title: 'Instrument + micro', sub: 'Une note est jouée : retrouve-la sur ta guitare ou ton mélodica' },
   ];
 
+  // v1.9 : la dictée à l'instrument et « Répéter la note » deviennent des exercices à part ; on reprend leurs anciens réglages.
+  [['mel', 'mel-inst', 'answerMode', 'instrument'], ['sing', 'sing-repeat', 'singMode', 'repeat']].forEach(([from, to, k, v]) => {
+    const old = Store.get('settings:' + from, null);
+    if (old && old[k] === v && !Store.get('settings:' + to, null)) Store.set('settings:' + to, old);
+  });
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const savedList = () => Store.get('saved', []);
   const findEx = (id) => BUILTIN.find((e) => e.id === id) || CHORD_BUILTIN.find((e) => e.id === id) || INST_BUILTIN.find((e) => e.id === id) || MEL_BUILTIN.find((e) => e.id === id) || SING_BUILTIN.find((e) => e.id === id) || IMPROV_BUILTIN.find((e) => e.id === id) || savedList().find((e) => e.id === id);
@@ -1138,55 +1264,203 @@ const Piano = (() => {
 
   /* ---------- Navigation (bouton retour Android) ---------- */
   let screen = 'home';
-  window.addEventListener('popstate', () => { if (screen !== 'home') goHome(); });
+  // Accueil : onglet courant et catégorie ouverte (restent en place quand on revient d'un exercice)
+  const HOME = { tab: Store.get('tab', 'today'), cat: null };
+  let skipPop = 0; // retours d'historique déjà traités par l'app (fermeture d'une catégorie)
+  function backHandled() { skipPop++; try { history.back(); } catch (err) { skipPop--; } }
+  window.addEventListener('popstate', (e) => {
+    if (skipPop > 0) { skipPop--; return; }
+    const to = e.state && e.state.s;
+    if (screen === 'cat') { if (!to || to === 'home') { HOME.cat = null; screen = 'home'; renderHome(); } }
+    else if (screen !== 'home') goHome();
+  });
   function pushScreen() { try { history.pushState({ s: screen }, ''); } catch (e) {} }
 
   function goHome() {
-    improvStop();
+    improvStop(); loopStop();
     micStop();
-    Piano.stopAll(); S = null; screen = 'home'; renderHome();
+    if (S && CUR && !CUR.recorded) recordSession(true);
+    Piano.stopAll(); S = null; screen = HOME.cat ? 'cat' : 'home'; renderHome();
+  }
+
+  /* ---------- Séances : enregistrement (durée, score, points faibles) ---------- */
+  let CUR = null; // séance en cours : { exId, start, recorded }
+  function beginSession() {
+    CUR = { exId: draft.ex.id, start: Date.now(), recorded: false };
+    Store.set('lastEx', draft.ex.id);
+  }
+  /** Enregistre la séance dans l'historique. partial = séance quittée avant la fin. */
+  function recordSession(partial = false) {
+    if (!S || !CUR || CUR.recorded) return;
+    CUR.recorded = true;
+    const dur = Math.round((Date.now() - CUR.start) / 1000);
+    let score, total;
+    if (S.type === 'improv' || S.type === 'loop') { score = S.stats.tonic; total = S.stats.done; }
+    else if (partial) { total = Math.max(0, (S.i || 1) - 1 - (S.skipped || 0)); score = Math.min(S.firstTry || 0, total); }
+    else { score = S.firstTry; total = S.n - (S.skipped || 0); }
+    if (partial && dur < 15 && !total) return;
+    const weak = Object.entries(S.missed || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n]) => weakLabel(n));
+    const hist = Store.get('history', []);
+    hist.push({ date: Date.now(), exId: CUR.exId, title: S.title, type: S.type || 'notes', score, total, skipped: S.skipped || 0, dur, partial, weak,
+      mode: S.mode, notes: S.notes, degrees: S.degrees, missed: S.missed });
+    Store.set('history', hist.slice(-500));
+  }
+  function weakLabel(n) {
+    if (S.type === 'chords') return chordLabel(Number(n));
+    if (S.type === 'instrument' || S.type === 'sing') return String(n);
+    return M.label(Number(n), (S.set && S.set.notation) || 'degres');
+  }
+
+  /* ---------- Catégories et parcours ---------- */
+  const CATS = [
+    { id: 'deg', deg: 0, glyph: '1', name: 'Degrés', step: 'Reconnaître les degrés', sub: 'Une note après la cadence', ids: ['maj', 'min', 'custom'], types: ['notes'] },
+    { id: 'acc', deg: 3, glyph: 'IV', name: 'Accords', step: 'Reconnaître les accords', sub: 'Degrés d\'accords et enchaînements', ids: ['ch-maj', 'ch-min', 'ch-custom'], types: ['chords'] },
+    { id: 'mel', deg: 2, glyph: '♫', name: 'Mélodies', step: 'Retenir une mélodie', sub: 'Dictée, aux boutons ou à l\'instrument', ids: ['mel', 'mel-inst'], types: ['melody'] },
+    { id: 'voi', deg: 1, glyph: '♩', name: 'Voix & instrument', step: 'Chanter et jouer', sub: 'Ta voix, ta guitare, ton mélodica', ids: ['sing', 'sing-repeat', 'inst'], types: ['sing', 'instrument'] },
+    { id: 'imp', deg: 4, glyph: '⇄', name: 'Improviser', step: 'Improviser', sub: 'Question-réponse en rythme', ids: ['loop', 'improv', 'improv2'], types: ['improv'] },
+  ];
+  const MINE = { id: 'mine', deg: 6, glyph: '★', name: 'Mes exercices', sub: 'Tes réglages enregistrés' };
+  const catExercises = (c) => (c.id === 'mine' ? savedList().map((e) => ({ ...e, glyph: '★', sub: summary(e) })) : c.ids.map(findEx).filter(Boolean));
+  const catOf = (exId) => CATS.find((c) => c.ids.includes(exId));
+
+  const TAB_ICON = {
+    today: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+    ex: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>',
+    path: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="5" r="2.5"/><circle cx="18" cy="12" r="2.5"/><circle cx="6" cy="19" r="2.5"/><path d="M8.5 5.5c6 0 9.5 1 9.5 4M15.5 12.5c-6 .5-9.5 2-9.5 4"/></svg>',
+    prog: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  };
+  const TABS = [['today', 'Aujourd\'hui'], ['ex', 'Exercices'], ['path', 'Parcours'], ['prog', 'Progrès']];
+
+  /* ---------- Statistiques tirées de l'historique ---------- */
+  const dayKey = (t) => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
+  function weekMinutes() {
+    const hist = Store.get('history', []);
+    const days = [];
+    for (let k = 6; k >= 0; k--) { const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - k); days.push({ d, key: dayKey(d), sec: 0 }); }
+    hist.forEach((h) => { const day = days.find((x) => x.key === dayKey(h.date)); if (day && h.dur) day.sec += h.dur; });
+    return days;
+  }
+  /** Réussite (du premier coup) sur une liste de séances. */
+  function rate(list) {
+    const s = list.reduce((a, h) => a + (h.score || 0), 0), t = list.reduce((a, h) => a + (h.total || 0), 0);
+    return t ? s / t : null;
+  }
+  function suggestions() {
+    const hist = Store.get('history', []).filter((h) => h.exId && h.total > 0);
+    const order = CATS.flatMap((c) => c.ids);
+    const tried = [], untried = [];
+    order.forEach((id) => {
+      if (id === 'improv' || id === 'loop') return; // une seule Question-réponse (la v2) ; la boucle n'a pas de score
+      const ex = findEx(id); if (!ex) return;
+      const mine = hist.filter((h) => h.exId === id).slice(-5);
+      if (!mine.length) { untried.push({ ex, why: 'Pas encore essayé' }); return; }
+      const r = rate(mine);
+      const counts = {};
+      mine.forEach((h) => (h.weak || []).forEach((w, k) => { counts[w] = (counts[w] || 0) + 3 - k; }));
+      const weak = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([w]) => w);
+      tried.push({ ex, r, why: `${Math.round(r * 100)} %${weak.length ? ' · points faibles : ' + weak.join(', ') : ''}` });
+    });
+    tried.sort((a, b) => a.r - b.r);
+    const weakOnes = tried.filter((t) => t.r < 0.85);
+    return [...weakOnes, ...untried, ...tried.filter((t) => t.r >= 0.85).map((t) => ({ ...t, why: t.why.replace(/ · points.*/, '') + ' · à entretenir' }))].slice(0, 3);
+  }
+  function catStats(c) {
+    const hist = Store.get('history', []).filter((h) => c.types.includes(h.type) && h.total > 0);
+    const recent = hist.slice(-10), before = hist.slice(-20, -10);
+    return { n: hist.length, r: rate(recent), prev: before.length >= 3 ? rate(before) : null };
   }
 
   /* ---------- Accueil ---------- */
-  function renderHome() {
-    const saved = savedList();
-    const hist = Store.get('history', []).slice(-5).reverse();
-    const card = (e, extra = '') => `
-      <button class="card" data-act="open" data-id="${e.id}">
-        <span class="glyph">${esc(e.glyph || '★')}</span>
+  const exCard = (e, c) => `
+      <button class="card" data-act="open" data-id="${e.id}"${c ? ` style="--c:var(--deg${c.deg})"` : ''}>
+        <span class="glyph${c ? ' tinted' : ''}">${esc(e.glyph || '★')}</span>
         <span class="txt"><span class="t">${esc(e.title)}</span><span class="s">${esc(e.sub || '')}</span></span>
-        <span class="chev">${extra || '›'}</span>
+        <span class="chev">›</span>
       </button>`;
-    $app.innerHTML = `
+
+  function renderHome() {
+    const tab = HOME.tab;
+    let body;
+    if (HOME.cat) body = renderCategory();
+    else if (tab === 'ex') body = renderTabExercises();
+    else if (tab === 'path') body = renderTabPath();
+    else if (tab === 'prog') body = renderTabProgress();
+    else body = renderTabToday();
+    $app.innerHTML = `<div class="home">${body}</div>
+      <nav class="tabbar" aria-label="Sections">${TABS.map(([k, l]) =>
+        `<button data-act="tab" data-v="${k}" aria-pressed="${k === tab && !HOME.cat}" aria-current="${k === tab ? 'page' : 'false'}">${TAB_ICON[k]}<span>${l}</span></button>`).join('')}</nav>`;
+  }
+
+  function renderTabToday() {
+    const last = findEx(Store.get('lastEx', ''));
+    const sug = suggestions();
+    const days = weekMinutes();
+    const max = Math.max(...days.map((d) => d.sec), 1);
+    const totalMin = Math.round(days.reduce((a, d) => a + d.sec, 0) / 60);
+    const DAYS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+    return `
       <header class="top"><div class="brand"><span class="brand-mark">Hear<span>·</span>Trainer</span></div></header>
-      <section class="section">
-        <span class="eyebrow">Fonctions harmoniques</span>
-        <div class="cards">${BUILTIN.map((e) => card(e)).join('')}</div>
+      ${last ? `<button class="resume" data-act="open" data-id="${last.id}"><span><small>Reprendre</small><b>${esc(last.title)}</b></span><span class="play" aria-hidden="true">▶</span></button>` : ''}
+      <section class="section"><span class="eyebrow">Proposé pour toi</span>
+        <div class="cards">${sug.map(({ ex, why }) => { const c = catOf(ex.id); return `
+          <button class="card" data-act="open" data-id="${ex.id}" style="--c:var(--deg${c ? c.deg : 6})">
+            <span class="glyph tinted">${esc(ex.glyph || '★')}</span>
+            <span class="txt"><span class="t">${esc(ex.title)}</span><span class="s">${esc(why)}</span></span><span class="chev">›</span>
+          </button>`; }).join('')}</div>
       </section>
-      <section class="section">
-        <span class="eyebrow">Accords</span>
-        <div class="cards">${CHORD_BUILTIN.map((e) => card(e)).join('')}</div>
-      </section>
-      <section class="section">
-        <span class="eyebrow">Improviser</span>
-        <div class="cards">${IMPROV_BUILTIN.map((e) => card(e)).join('')}</div>
-      </section>
-      ${saved.length ? `<section class="section"><span class="eyebrow">Mes exercices</span>
-        <div class="cards">${saved.map((e) => card({ ...e, glyph: '★', sub: summary(e) })).join('')}</div></section>` : ''}
-      <section class="section">
-        <span class="eyebrow">Mélodies</span>
-        <div class="cards">${MEL_BUILTIN.map((e) => card(e)).join('')}</div>
-      </section>
-      <section class="section">
-        <span class="eyebrow">Avec ta voix ou ton instrument</span>
-        <div class="cards">${[...SING_BUILTIN, ...INST_BUILTIN].map((e) => card(e)).join('')}</div>
-      </section>
-      <section class="section">
-        <span class="eyebrow">Dernières séances</span>
-        <div class="history">${hist.length ? hist.map((h) => `
-          <div class="row"><span>${esc(h.title)} <span class="muted">· ${new Date(h.date).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' })}</span></span>
-          <b>${h.score} / ${h.total}</b></div>`).join('') : '<div class="empty">Tes résultats apparaîtront ici après ta première série.</div>'}</div>
+      <section class="section"><span class="eyebrow">Ta semaine</span>
+        <div class="week-panel">
+          <div class="week" role="img" aria-label="Minutes d'entraînement des 7 derniers jours">${days.map((d) => `
+            <div class="wday${dayKey(d.d) === dayKey(Date.now()) ? ' today' : ''}"><span class="wmin">${d.sec >= 30 ? Math.round(d.sec / 60) : ''}</span><i style="height:${Math.round((d.sec / max) * 100)}%"></i><span class="wlbl">${DAYS[d.d.getDay()]}</span></div>`).join('')}</div>
+          <p class="hint">${totalMin ? `${totalMin} minute${totalMin > 1 ? 's' : ''} d'entraînement sur 7 jours.` : 'Tes minutes d\'entraînement apparaîtront ici dès ta première séance.'}</p>
+        </div>
       </section>`;
+  }
+
+  function renderTabExercises() {
+    const tile = (c, n) => `<button class="tile" data-act="cat" data-v="${c.id}" style="--c:var(--deg${c.deg})">
+        <span class="tile-g">${esc(c.glyph)}</span><span><b>${esc(c.name)}</b><small>${c.id === 'mine' && !n ? 'Aucun pour l\'instant' : `${n} exercice${n > 1 ? 's' : ''}${c.id === 'mine' ? ' enregistré' + (n > 1 ? 's' : '') : ''}`}</small></span></button>`;
+    return `
+      <header class="top"><h1 class="tab-title">Exercices</h1></header>
+      <div class="tiles">${CATS.map((c) => tile(c, c.ids.length)).join('')}${tile(MINE, savedList().length)}</div>`;
+  }
+
+  function renderTabPath() {
+    return `
+      <header class="top"><h1 class="tab-title">Parcours</h1></header>
+      <p class="hint">Un ordre conseillé, de l'écoute à l'improvisation. Tous les exercices restent ouverts : va où tu veux.</p>
+      <ol class="path">${CATS.map((c, k) => `
+        <li class="step" style="--c:var(--deg${c.deg})"><span class="step-dot">${k + 1}</span>
+          <button class="step-card" data-act="cat" data-v="${c.id}" data-step="1"><b>${esc(c.step)}</b><span class="s">${esc(c.sub)}</span>
+            <span class="chips">${catExercises(c).map((e) => `<span>${esc(e.title)}</span>`).join('')}</span></button></li>`).join('')}</ol>`;
+  }
+
+  function renderTabProgress() {
+    const rows = CATS.map((c) => {
+      const st = catStats(c);
+      const pct = st.r === null ? null : Math.round(st.r * 100);
+      const trend = st.prev === null || st.r === null ? '' : st.r - st.prev > 0.03 ? '<span class="trend up">▲ en progrès</span>' : st.r - st.prev < -0.03 ? '<span class="trend down">▼ en baisse</span>' : '<span class="trend">= stable</span>';
+      return `<div class="prog-row" style="--c:var(--deg${c.deg})">
+        <div class="prog-head"><b>${esc(c.name)}</b><span class="prog-pct">${pct === null ? '—' : pct + ' %'}</span></div>
+        <div class="meter"><i style="width:${pct || 0}%"></i></div>
+        <span class="hint">${st.n ? `${c.id === 'imp' ? 'Réponses conclues sur la tonique' : 'Réussite du premier coup'}, ${st.n > 10 ? `sur tes 10 dernières séances (${st.n} au total)` : `sur ${st.n > 1 ? 'tes ' + st.n + ' séances' : 'ta séance'}`} ${trend}` : 'Pas encore de séance.'}</span></div>`;
+    }).join('');
+    return `
+      <header class="top"><h1 class="tab-title">Progrès</h1></header>
+      <section class="section"><span class="eyebrow">Réussite par catégorie</span><div class="panel">${rows}</div></section>`;
+  }
+
+  function renderCategory() {
+    const c = HOME.cat === 'mine' ? MINE : CATS.find((x) => x.id === HOME.cat);
+    const asStep = HOME.fromStep && c.step;
+    const list = catExercises(c);
+    // exercices enregistrés : aussi rangés dans leur catégorie (Degrés ou Accords)
+    const mine = c.id === 'deg' || c.id === 'acc' ? catExercises(MINE).filter((e) => (isChords(e) ? 'acc' : 'deg') === c.id) : [];
+    return `
+      <header class="top"><button class="link-btn" data-act="cat-back">‹ ${asStep ? 'Parcours' : 'Exercices'}</button></header>
+      <div class="cat-head" style="--c:var(--deg${c.deg})"><span class="eyebrow">${asStep ? 'Étape ' + (CATS.indexOf(c) + 1) : 'Catégorie'}</span><h1>${esc(asStep ? c.step : c.name)}</h1><p>${esc(c.sub)}</p></div>
+      <div class="cards">${list.length ? list.map((e) => exCard(e, c)).join('') : '<p class="empty panel">Aucun exercice enregistré pour l\'instant. Dans les réglages d\'un exercice, utilise « Enregistrer » pour le retrouver ici.</p>'}</div>
+      ${mine.length ? `<section class="section"><span class="eyebrow">Tes versions enregistrées</span><div class="cards">${mine.map((e) => exCard(e, c)).join('')}</div></section>` : ''}`;
   }
 
   function summary(e) {
@@ -1210,13 +1484,18 @@ const Piano = (() => {
       screen = 'setup'; pushScreen();
       return renderSetup();
     }
+    if (ex.type === 'loop') {
+      draft = { ex, settings: { ...LOOP_DEFAULTS, ...Store.get('settings:' + id, {}) } };
+      screen = 'setup'; pushScreen();
+      return renderSetup();
+    }
     if (ex.type === 'sing') {
-      draft = { ex, settings: { ...SING_DEFAULTS, ...Store.get('settings:' + id, {}) } };
+      draft = { ex, settings: { ...SING_DEFAULTS, ...Store.get('settings:' + id, {}), ...(ex.fixed || {}) } };
       screen = 'setup'; pushScreen();
       return renderSetup();
     }
     if (ex.type === 'melody') {
-      draft = { ex, settings: { ...MEL_DEFAULTS, ...Store.get('settings:' + id, {}) } };
+      draft = { ex, settings: { ...MEL_DEFAULTS, ...Store.get('settings:' + id, {}), ...(ex.fixed || {}) } };
       screen = 'setup'; pushScreen();
       return renderSetup();
     }
@@ -1259,6 +1538,7 @@ const Piano = (() => {
     if (draft.ex.type === 'melody') return renderSetupMelody();
     if (draft.ex.type === 'sing') return renderSetupSing();
     if (draft.ex.type === 'improv') return renderSetupImprov();
+    if (draft.ex.type === 'loop') return renderSetupLoop();
     const { ex, settings: s } = draft;
     const editable = ex.custom || ex.saved;
     const presets = [['major', 'Majeur'], ['minor', 'Mineur nat.'], ['harmonic', 'Mineur harm.'], ['melodic', 'Mineur mél.'], ['all', 'Les 12'], ['none', 'Aucune']];
@@ -1317,11 +1597,11 @@ const Piano = (() => {
   function setSetting(k, v) {
     const s = draft.settings;
     if (k === 'mode' && draft.ex.type !== 'instrument') draft.mode = v;
-    else if (k === 'scale' && (draft.ex.type === 'melody' || draft.ex.type === 'improv')) s.scale = v;
+    else if (k === 'scale' && (draft.ex.type === 'melody' || draft.ex.type === 'improv' || draft.ex.type === 'loop')) s.scale = v;
     else if (k === 'scale') draft.scale = v;
     else if (k === 'mode' && draft.ex.type === 'instrument') s.mode = v;
-    else if (k === 'octaves' || k === 'questions' || k === 'seqLength' || k === 'hold' || k === 'seqLen' || k === 'bars') s[k] = Number(v);
-    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones') s[k] = v === 'true';
+    else if (k === 'octaves' || k === 'questions' || k === 'seqLength' || k === 'hold' || k === 'seqLen' || k === 'bars' || k === 'bpc' || k === 'bpm' || k === 'keyPc') s[k] = Number(v);
+    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones' || k === 'metro') s[k] = v === 'true';
     else if (k === 'count') s[k] = v === 'auto' ? 'auto' : Number(v);
     else s[k] = v;
     persistDraft(); renderSetup();
@@ -1363,11 +1643,13 @@ const Piano = (() => {
   let S = null;
 
   async function startSession() {
+    beginSession();
     if (isChords(draft.ex)) return startChordSession();
     if (draft.ex.type === 'instrument') return startInstrumentSession();
     if (draft.ex.type === 'melody') return startMelodySession();
     if (draft.ex.type === 'sing') return startSingSession();
     if (draft.ex.type === 'improv') return startImprovSession();
+    if (draft.ex.type === 'loop') return startLoopSession();
     const { ex, settings } = draft;
     if (ex.saved) { // garder les derniers réglages de l'exercice enregistré
       const list = savedList(); const i = list.findIndex((e) => e.id === ex.id);
@@ -1494,9 +1776,7 @@ const Piano = (() => {
 
   function finish() {
     Piano.stopAll(); micStop();
-    const hist = Store.get('history', []);
-    hist.push({ date: Date.now(), title: S.title, type: S.type || 'notes', score: S.firstTry, total: S.n - (S.skipped || 0), skipped: S.skipped || 0, mode: S.mode, notes: S.notes, degrees: S.degrees, missed: S.missed });
-    Store.set('history', hist.slice(-500));
+    recordSession(false);
     screen = 'results';
     renderResults();
   }
@@ -2049,8 +2329,6 @@ const Piano = (() => {
           ${seg('count', [['auto', 'Selon le niveau'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [7, '7'], [8, '8']], s.count)}</div>
         <div class="setting"><span class="lbl">Tempo</span>
           ${seg('tempo', [['slow', 'Lent'], ['medium', 'Moyen'], ['fast', 'Rapide']], s.tempo)}</div>
-        <div class="setting"><span class="lbl">Répondre</span>
-          ${seg('answerMode', [['buttons', 'Avec les boutons'], ['instrument', 'Sur mon instrument (micro)']], s.answerMode)}</div>
         ${s.answerMode === 'instrument' ? `
         <div class="setting"><span class="lbl">Instrument</span>
           ${seg('instrument', [['guitar', 'Guitare classique'], ['melodica', 'Mélodica']], s.instrument)}
@@ -2093,7 +2371,7 @@ const Piano = (() => {
     const s = { ...draft.settings };
     const scaleNotes = M.SCALES[s.scale].notes;
     S = {
-      type: 'melody', title: 'Dictée · ' + M.SCALES[s.scale].name.toLowerCase(),
+      type: 'melody', title: (s.answerMode === 'instrument' ? 'Dictée à l\'instrument · ' : 'Dictée · ') + M.SCALES[s.scale].name.toLowerCase(),
       set: s, mode: M.SCALES[s.scale].mode, resScale: scaleNotes, notes: scaleNotes,
       n: Math.max(1, Math.min(200, s.questions || 10)),
       i: 0, firstTry: 0, missed: {}, token: 0, keyPc: null, kbdOpen: false,
@@ -2304,9 +2582,7 @@ const Piano = (() => {
       <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
       <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
       <div class="panel">
-        <div class="setting"><span class="lbl">Mode</span>
-          ${seg('singMode', [['imagine', 'Imaginer et chanter'], ['repeat', 'Répéter la note']], s.singMode)}
-          <p class="hint">${s.singMode === 'repeat' ? 'L\'app joue la note après la cadence : tu la répètes. Idéal pour t\'échauffer.' : 'Seul le degré est affiché : tu l\'imagines dans ta tête, puis tu le chantes.'}</p></div>
+        <p class="hint">${s.singMode === 'repeat' ? 'L\'app joue la note après la cadence : tu la répètes. Idéal pour t\'échauffer.' : 'Seul le degré est affiché : tu l\'imagines dans ta tête, puis tu le chantes.'}</p>
         <div class="setting"><span class="lbl">Voix</span>
           ${seg('voice', [['low', 'Grave (homme)'], ['high', 'Aiguë (femme)']], s.voice)}
           <p class="hint">Place la cadence à une hauteur confortable. Tu peux chanter à n'importe quelle octave.</p></div>
@@ -2605,6 +2881,180 @@ const Piano = (() => {
     cancelAnimationFrame(IMP.raf); IMP.raf = 0;
     IMP.recording = false;
     IMP.clicks.forEach((o) => { try { o.stop(); } catch (e) {} }); IMP.clicks = [];
+  }
+
+  /* ---------- Boucle d'accords (backing track pour improviser) ---------- */
+  const LOOP_DEFAULTS = {
+    loop: 'surprise', bpc: 1, bpm: 90, scale: 'major', tonalite: 'random-not-c', keyPc: 0,
+    style: 'hold', metro: true, tones: 'show', showKey: true,
+  };
+  const LOOP = { timer: 0, raf: 0, wake: null };
+  const loopList = (scaleKey) => Melody.LOOPS.filter((l) => !l.minor || M.SCALES[scaleKey].mode === 'minor');
+  const chordQual = (pcs) => { const th = M.mod(pcs[1] - pcs[0], 12), fi = M.mod(pcs[2] - pcs[0], 12); return fi === 6 ? '°' : fi === 8 ? '+' : th === 3 ? 'm' : ''; };
+
+  function renderSetupLoop() {
+    const { ex, settings: s } = draft;
+    const sc = M.SCALES[s.scale].notes;
+    const romans = (l) => l.chords.map((d) => M.triad(sc, d).name).join(' – ');
+    const list = loopList(s.scale);
+    if (s.loop !== 'surprise' && !list.some((l) => l.name === s.loop)) s.loop = 'surprise';
+    $app.innerHTML = `
+      <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
+      <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
+      <p class="hint">L'app joue une boucle d'accords en continu : improvise par-dessus à ta guitare ou ton mélodica. Pas besoin du micro.</p>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Gamme</span>${seg('scale', SCALE_OPTS, s.scale)}</div>
+        <div class="setting"><span class="lbl">Boucle</span>
+          <div class="loop-list">${[['surprise', 'Surprends-moi', 'Une des boucles ci-dessous, tirée au hasard']].concat(list.map((l) => [l.name, l.name, romans(l)])).map(([v, t, sub]) =>
+            `<button data-act="set" data-k="loop" data-v="${esc(v)}" aria-pressed="${s.loop === v}"><b>${esc(t)}</b><span>${esc(sub)}</span></button>`).join('')}</div></div>
+        <div class="setting"><span class="lbl">Mesures par accord</span>
+          ${seg('bpc', [[1, '1 mesure'], [2, '2 mesures'], [4, '4 mesures']], s.bpc)}</div>
+        <div class="setting"><label for="bpm">Tempo</label>
+          <div class="row-gap">${seg('bpm', [[70, 'Lent'], [90, 'Moyen'], [120, 'Rapide']], s.bpm)}
+          <input id="bpm" class="num" type="number" min="40" max="200" inputmode="numeric" value="${s.bpm}" aria-label="Tempo en battements par minute"><span class="muted">BPM</span></div></div>
+      </div>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Tonalité</span>
+          ${seg('tonalite', [['do', 'Do'], ['random-not-c', 'Aléatoire sauf Do'], ['random', 'Aléatoire'], ['choose', 'Je choisis']], s.tonalite)}
+          ${s.tonalite === 'choose' ? `<div class="notes12">${Array.from({ length: 12 }, (_, pc) =>
+            `<button data-act="set" data-k="keyPc" data-v="${pc}" aria-pressed="${s.keyPc === pc}">${esc((M.SCALES[s.scale].mode === 'minor' ? M.noteName(pc, 'minor') : M.noteName(pc, 'major')))}</button>`).join('')}</div>` : ''}</div>
+        <div class="setting"><span class="lbl">Afficher la tonalité</span>${seg('showKey', [['true', 'Oui'], ['false', 'Non']], s.showKey)}</div>
+        <div class="setting"><span class="lbl">Accompagnement</span>
+          ${seg('style', [['hold', 'Accords tenus'], ['pulse', 'Sur chaque temps'], ['boom', 'Boum-tchak'], ['arp', 'Arpèges']], s.style)}</div>
+        <div class="setting"><span class="lbl">Métronome</span>${seg('metro', [['true', 'Oui'], ['false', 'Non']], s.metro)}
+          <p class="hint">Une mesure de décompte avant le départ, dans tous les cas.</p></div>
+        <div class="setting"><span class="lbl">Notes de l'accord</span>
+          ${seg('tones', [['show', 'Affichées'], ['quiz', 'À retrouver']], s.tones)}
+          <p class="hint">${s.tones === 'quiz' ? 'Les notes sont cachées : retrouve-les de tête, puis touche l\'accord pour vérifier.' : 'Les notes de l\'accord en cours, en degrés par rapport à la tonique (ex. ii = 2 – 4 – 6).'}</p></div>
+      </div>
+      <button class="btn wide" data-act="start">Commencer</button>`;
+  }
+
+  async function startLoopSession() {
+    const s = { ...draft.settings };
+    const sc = M.SCALES[s.scale].notes;
+    S = {
+      type: 'loop', title: 'Boucle d\'accords', set: s, mode: M.SCALES[s.scale].mode, resScale: sc,
+      n: 0, i: 0, firstTry: 0, missed: {}, token: 0, stats: { done: 0, tonic: 0 },
+      keyPc: s.tonalite === 'choose' ? s.keyPc : M.pickKey(s.tonalite, null),
+      running: false, loop: null, reveal: -1, abs: -1,
+    };
+    pickLoop();
+    screen = 'play'; pushScreen();
+    $app.innerHTML = '<div class="loading">Chargement du piano…</div>';
+    await Piano.unlock();
+    if (!S) return;
+    renderPlayLoop();
+  }
+
+  /** Choisit la boucle : par son rang dans la liste (flèches), sinon celle des réglages, sinon au hasard. */
+  function pickLoop(idx) {
+    const list = loopList(S.set.scale);
+    let l = idx != null ? list[M.mod(idx, list.length)] : S.loop ? null : list.find((x) => x.name === S.set.loop);
+    if (!l) { const pool = list.filter((x) => !S.loop || x.name !== S.loop.name); l = pool[Math.floor(Math.random() * pool.length)]; }
+    S.loop = l; S.loopIdx = list.indexOf(l); S.loopCount = list.length;
+    S.t = M.tonicMidi(S.keyPc);
+    S.chords = l.chords.map((d) => ({ d, ...M.triad(S.resScale, d) }));
+    S.voiced = M.voiceProgression(S.t, S.chords);
+  }
+
+  function loopStop() {
+    clearInterval(LOOP.timer); LOOP.timer = 0;
+    cancelAnimationFrame(LOOP.raf); LOOP.raf = 0;
+    if (LOOP.wake) { try { LOOP.wake.release(); } catch (e) {} LOOP.wake = null; }
+    if (S && S.type === 'loop') S.running = false;
+  }
+
+  /** Programme les notes d'un accord (toutes ses mesures) selon le style choisi. */
+  function scheduleLoopChord(k, at, beat) {
+    const s = S.set, v = S.voiced[k], n = 4 * s.bpc, rel = releaseTime();
+    const chord = (t, dur, vb = 0.42, vu = 0.3) => { Piano.note(v.bass, t, dur, vb, rel); v.upper.forEach((m) => Piano.note(m, t, dur, vu, rel)); };
+    for (let b = 0; b < n; b++) {
+      const t = at + b * beat, inBar = b % 4;
+      if (s.style === 'hold') { if (inBar === 0) chord(t, 4 * beat * 0.98); }
+      else if (s.style === 'pulse') { if (inBar % 2 === 0) Piano.note(v.bass, t, beat * 1.9, 0.4, rel); v.upper.forEach((m) => Piano.note(m, t, beat * 0.55, inBar === 0 ? 0.32 : 0.24, 0.08)); }
+      else if (s.style === 'boom') { if (inBar % 2 === 0) Piano.note(inBar === 0 ? v.bass : v.bass + 7, t, beat * 0.9, 0.45, rel); else v.upper.forEach((m) => Piano.note(m, t, beat * 0.45, 0.26, 0.08)); }
+      else { const seq = [v.bass, v.upper[0], v.upper[1], v.upper[2]]; Piano.note(seq[inBar], t, beat * 1.1, inBar === 0 ? 0.42 : 0.3, rel); }
+      if (s.metro) improvClick(t, inBar === 0);
+    }
+  }
+
+  function startLoop() {
+    loopStop(); Piano.stopAll();
+    const ctx = Piano.ctx, beat = 60 / S.set.bpm, chordDur = 4 * S.set.bpc * beat;
+    const T0 = ctx.currentTime + 0.25, start = T0 + 4 * beat;
+    for (let b = 0; b < 4; b++) improvClick(T0 + b * beat, b === 0);   // décompte
+    Object.assign(S, { running: true, beat, chordDur, start, next: 0, nextAt: start, abs: -1, reveal: -1 });
+    const pump = () => {
+      while (S && S.running && S.nextAt < Piano.ctx.currentTime + 0.8) {
+        scheduleLoopChord(S.next % S.chords.length, S.nextAt, beat);
+        S.next++; S.nextAt += chordDur;
+      }
+    };
+    pump(); LOOP.timer = setInterval(pump, 120);
+    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then((w) => { LOOP.wake = w; }).catch(() => {}); } catch (e) {}
+    renderPlayLoop();
+    const tick = () => {
+      if (!S || S.type !== 'loop' || !S.running) return;
+      const now = Piano.ctx.currentTime;
+      const dots = $app.querySelectorAll('.beat-dot');
+      const phase = $app.querySelector('#phase');
+      if (now < S.start) {
+        const b = Math.max(0, Math.floor((now - (S.start - 4 * beat)) / beat));
+        dots.forEach((d, k) => d.classList.toggle('on', k === b));
+        if (phase) phase.textContent = String(Math.min(4, b + 1));
+      } else {
+        const pos = (now - S.start) / beat, abs = Math.floor((now - S.start) / chordDur);
+        if (abs !== S.abs) { S.abs = abs; renderPlayLoop(); return void (LOOP.raf = requestAnimationFrame(tick)); }
+        const b = Math.floor(pos) % 4;
+        dots.forEach((d, k) => d.classList.toggle('on', k === b));
+        const bar = $app.querySelector('#loop-bar');
+        if (bar && S.set.bpc > 1) bar.textContent = `Mesure ${Math.floor(pos / 4) % S.set.bpc + 1} / ${S.set.bpc}`;
+      }
+      LOOP.raf = requestAnimationFrame(tick);
+    };
+    LOOP.raf = requestAnimationFrame(tick);
+  }
+
+  function renderPlayLoop() {
+    const s = S.set, L = S.chords.length;
+    const k = S.abs >= 0 ? S.abs % L : 0, nx = (k + 1) % L;
+    const c = S.chords[k], cn = S.chords[nx];
+    const nm = (ch) => (s.showKey === false ? '' : M.noteName(S.t + ch.pcs[0], S.mode) + chordQual(ch.pcs));
+    const tones = (ch) => ch.pcs.map((pc) => esc(M.label(pc, 'degres'))).join(' – ');
+    const hidden = s.tones === 'quiz' && S.reveal !== S.abs;
+    const counting = S.running && S.abs < 0;
+    $app.innerHTML = `
+      <header class="top">
+        <button class="link-btn" data-act="home">‹ Quitter</button>
+        <span class="score">${s.bpm} BPM</span>
+      </header>
+      <div class="stage">
+        <span class="eyebrow">Boucle d'accords · ${esc(M.SCALES[s.scale].name.toLowerCase())}</span>
+        <span class="key">${s.showKey === false ? '?' : esc(M.keyName(S.keyPc, S.mode))}</span>
+      </div>
+      <div class="loop-nav">
+        <button class="ctl" data-act="loop-step" data-v="-1" aria-label="Boucle précédente">‹</button>
+        <div><b>${esc(S.loop.name)}</b><span class="hint">${S.loopIdx + 1} / ${S.loopCount} · ${S.chords.map((ch) => esc(ch.name)).join(' – ')}</span></div>
+        <button class="ctl" data-act="loop-step" data-v="1" aria-label="Boucle suivante">›</button>
+      </div>
+      <button class="loop-now" data-act="loop-reveal" style="--c:var(--deg${c.d})" ${s.tones === 'quiz' ? '' : 'tabindex="-1"'}>
+        <span class="eyebrow">${counting ? 'Départ sur' : S.running ? 'Maintenant' : 'Premier accord'}</span>
+        <span class="loop-roman">${esc(c.name)}</span>
+        ${nm(c) ? `<span class="loop-name">${esc(nm(c))}</span>` : ''}
+        <span class="loop-tones">${hidden ? '? – ? – ?' : tones(c)}</span>
+        ${s.tones === 'quiz' ? `<span class="hint">${hidden ? 'Touche pour vérifier' : 'Notes de l\'accord'}</span>` : ''}
+      </button>
+      <div class="loop-next" style="--c:var(--deg${cn.d})"><span class="muted">Ensuite</span><b>${esc(cn.name)}</b>${nm(cn) ? `<span class="muted">${esc(nm(cn))}</span>` : ''}${s.tones === 'show' ? `<span class="muted">${tones(cn)}</span>` : ''}</div>
+      <div class="improv-run">
+        <div class="beats">${[0, 1, 2, 3].map((b) => `<span class="beat-dot${b === 0 ? ' accent' : ''}"></span>`).join('')}</div>
+        ${S.running && !counting ? '' : `<p class="phase" id="phase">${counting ? '1' : 'Prêt ?'}</p>`}
+        <p class="hint" id="loop-bar">${S.running ? '' : `${L} accords, ${s.bpc} mesure${s.bpc > 1 ? 's' : ''} par accord, en boucle jusqu'à ce que tu arrêtes.`}</p>
+      </div>
+      <div class="prog-bars loop-grid">${S.chords.map((ch, j) => `<span class="prog-bar"><span class="prog-chord${S.running && S.abs >= 0 && j === k ? ' on' : ''}" style="--c:var(--deg${ch.d})">${esc(ch.name)}</span></span>`).join('')}</div>
+      ${S.running ? '<button class="btn secondary wide" data-act="loop-stop">Arrêter</button>'
+        : `<div class="actions"><button class="btn secondary" data-act="loop-rand">Au hasard</button><button class="btn" data-act="loop-go">${S.played ? 'Relancer' : 'Lancer la boucle'}</button></div>`}
+      ${s.tonalite === 'random' || s.tonalite === 'random-not-c' ? '<button class="link-btn" data-act="loop-key" style="align-self:center">Autre tonalité</button>' : ''}`;
   }
 
   function renderSetupImprov() {
@@ -2988,9 +3438,7 @@ const Piano = (() => {
         <button class="btn secondary" data-act="home">Accueil</button>
         <button class="btn" data-act="again">Recommencer</button>
       </div>`;
-    const hist = Store.get('history', []);
-    hist.push({ date: Date.now(), title: 'Question-réponse', type: 'improv', score: st.tonic, total: st.done });
-    Store.set('history', hist.slice(-500));
+    recordSession(false);
   }
 
   /* ---------- Événements ---------- */
@@ -3001,6 +3449,19 @@ const Piano = (() => {
     switch (b.dataset.act) {
       case 'home': try { history.back(); } catch (err) {} goHome(); break;
       case 'open': openSetup(b.dataset.id); break;
+      case 'loop-go': S.played = true; startLoop(); break;
+      case 'loop-stop': loopStop(); Piano.stopAll(); S.abs = -1; renderPlayLoop(); break;
+      case 'loop-step': case 'loop-rand': case 'loop-key': {
+        const was = S.running;
+        if (b.dataset.act === 'loop-key') { S.keyPc = M.pickKey(S.set.tonalite, S.keyPc); pickLoop(S.loopIdx); }
+        else pickLoop(b.dataset.act === 'loop-step' ? S.loopIdx + Number(v) : undefined);
+        if (was) startLoop(); else renderPlayLoop();   // en cours : on relance tout de suite sur la nouvelle boucle
+        break;
+      }
+      case 'loop-reveal': if (S && S.set.tones === 'quiz') { S.reveal = S.abs; renderPlayLoop(); } break;
+      case 'tab': HOME.tab = v; HOME.cat = null; Store.set('tab', v); if (screen === 'cat') backHandled(); screen = 'home'; renderHome(); window.scrollTo(0, 0); break;
+      case 'cat': HOME.cat = v; HOME.fromStep = !!b.dataset.step; screen = 'cat'; pushScreen(); renderHome(); window.scrollTo(0, 0); break;
+      case 'cat-back': if (screen === 'cat') backHandled(); HOME.cat = null; screen = 'home'; renderHome(); break;
       case 'set': setSetting(b.dataset.k, v); break;
       case 'preset': applyPreset(v); break;
       case 'toggle-note': {
@@ -3081,6 +3542,9 @@ const Piano = (() => {
     }
   });
   $app.addEventListener('change', (e) => {
+    if (e.target.id === 'bpm') {
+      draft.settings.bpm = Math.max(40, Math.min(200, parseInt(e.target.value, 10) || 90)); persistDraft(); renderSetup();
+    }
     if (e.target.id === 'q-num') {
       const n = Math.max(1, Math.min(200, parseInt(e.target.value, 10) || 20));
       draft.settings.questions = n; persistDraft(); renderSetup();
