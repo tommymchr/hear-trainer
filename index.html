@@ -501,6 +501,12 @@ p { margin: 0; }
 .slots.many { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; max-width: 360px; margin: 0 auto; }
 .slots.many .slot { min-width: 0; text-align: center; }
 .loop-now { box-sizing: border-box; }
+.mode-ask { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: var(--radius); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); text-align: center; }
+.tk-w.ok { background: var(--good-soft); box-shadow: inset 0 -6px 0 var(--good); color: var(--good); }
+.tk-b.ok { background: var(--good); }
+.tk-w.no { background: var(--bad-soft); box-shadow: inset 0 -6px 0 var(--bad); color: var(--bad); }
+.tk-b.no { background: var(--bad); }
+.tk-w, .tk-b, .wk, .bk, .help-chords button { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 
 </style>
 </head>
@@ -1166,7 +1172,7 @@ const Piano = (() => {
   function init() {
     if (ready) return ready;
     const AC = window.AudioContext || window.webkitAudioContext;
-    ctx = new AC();
+    ctx = new AC({ latencyHint: 'interactive' });   // priorité à la réactivité (touches jouées au doigt)
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -14; comp.ratio.value = 3;
     out = ctx.createGain();
@@ -3736,7 +3742,7 @@ const Piano = (() => {
   /* ---------- Trouver la tonique (sans cadence) ---------- */
   const TONIC_DEFAULTS = {
     context: 'chords', listen: 'loop', check: false, answer: 'buttons', headphones: false,
-    level: 'easy', modeSel: 'major', bpm: 90, groove: 'pop', questions: 10,
+    level: 'easy', modeSel: 'major', bpm: 90, groove: 'pop', questions: 10, lead: false,
   };
   const TON = { pump: 0, det: 0, drums: [] };
   const PC_NAMES = ['Do', 'Do♯', 'Ré', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
@@ -3744,7 +3750,6 @@ const Piano = (() => {
   function renderSetupTonic() {
     const { ex, settings: s } = draft;
     const micNoHp = s.answer === 'instrument' && !s.headphones;
-    if (micNoHp && s.listen === 'loop') s.listen = 'twice';
     $app.innerHTML = `
       <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
       <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
@@ -3753,23 +3758,26 @@ const Piano = (() => {
         <div class="setting"><span class="lbl">Ce que tu entends</span>
           ${seg('context', [['melody', 'Une mélodie'], ['chords', 'Des accords'], ['band', 'Un groupe']], s.context)}
           <p class="hint">${{ melody: 'Une courte phrase jouée seule, sans accords.', chords: 'Une boucle d\'accords au piano.', band: 'Batterie, basse et accords : le contexte le plus proche d\'un vrai morceau.' }[s.context]}</p></div>
-        ${s.context === 'band' ? `<div class="setting"><span class="lbl">Style</span>${seg('groove', [['pop', 'Pop'], ['rock', 'Rock'], ['ballad', 'Ballade'], ['bossa', 'Bossa']], s.groove)}</div>` : ''}
+        ${s.context === 'band' ? `<div class="setting"><span class="lbl">Style</span>${seg('groove', [['pop', 'Pop'], ['rock', 'Rock'], ['ballad', 'Ballade'], ['bossa', 'Bossa']], s.groove)}</div>
+        <div class="setting"><span class="lbl">Mélodie par-dessus</span>${seg('lead', [['false', 'Non'], ['true', 'Oui']], s.lead)}
+          <p class="hint">${s.lead ? 'Une mélodie (piano aigu) chante sur le groupe, comme la voix d\'une chanson.' : 'Seulement le groupe : batterie, basse et accords.'}</p></div>` : ''}
         <div class="setting"><span class="lbl">Écoute</span>
           ${seg('listen', [['loop', 'En boucle'], ['twice', 'Deux fois'], ['once', 'Une fois']], s.listen)}
-          <p class="hint">${micNoHp ? 'Sans écouteurs, réponds à l\'instrument quand la musique s\'est arrêtée (le micro entendrait le piano) : « En boucle » n\'est pas possible.' : { loop: 'La musique tourne jusqu\'à ta réponse : tu as tout ton temps.', twice: 'La musique passe deux fois puis s\'arrête.', once: 'Une seule écoute : il faut être sûr tout de suite.' }[s.listen]} ${s.listen !== 'loop' ? '« Réécouter » reste possible, mais la réponse ne compte plus du premier coup.' : ''}</p></div>
+          <p class="hint">${micNoHp ? 'Sans écouteurs, tu joues ta réponse une fois la musique arrêtée (le micro entendrait le piano). ' : ''}${{ loop: 'La musique tourne jusqu\'à ta réponse : tu as tout ton temps.', twice: 'La musique passe deux fois puis s\'arrête.', once: 'Une seule écoute : il faut être sûr tout de suite.' }[s.listen]} ${s.listen !== 'loop' ? '« Réécouter » reste possible, mais la réponse ne compte plus du premier coup.' : ''}</p></div>
         <div class="setting"><span class="lbl">Difficulté</span>
           ${seg('level', [['easy', 'Facile'], ['medium', 'Moyen'], ['hard', 'Difficile']], s.level)}
           <p class="hint">${s.context === 'melody' ? { easy: 'La phrase finit sur la tonique.', medium: 'La phrase s\'arrête juste avant la tonique.', hard: 'La phrase s\'arrête une mesure avant la fin : pas de conclusion.' }[s.level]
             : { easy: 'La boucle commence sur I et contient V : la tonique s\'impose vite.', medium: 'La boucle commence sur I, sans forcément passer par V.', hard: 'La boucle commence sur un autre accord (ex. vi, IV) : en majeur, on peut l\'entendre dans le mineur relatif.' }[s.level]}</p></div>
-        <div class="setting"><span class="lbl">Mode</span>${seg('modeSel', [['major', 'Majeur'], ['minor', 'Mineur'], ['both', 'Les deux']], s.modeSel)}</div>
+        <div class="setting"><span class="lbl">Mode</span>${seg('modeSel', [['major', 'Majeur'], ['minor', 'Mineur'], ['both', 'Les deux']], s.modeSel)}
+          ${s.modeSel === 'both' ? '<p class="hint">Après la tonique, dis aussi si c\'est majeur ou mineur : la réponse est juste si les deux le sont.</p>' : ''}</div>
       </div>
       <div class="panel">
         <div class="setting"><span class="lbl">Répondre</span>
           ${seg('answer', [['buttons', 'Avec les boutons'], ['instrument', 'Avec mon instrument']], s.answer)}</div>
         ${s.answer === 'instrument' ? `<div class="setting"><span class="lbl">J'ai des écouteurs</span>${seg('headphones', [['false', 'Non'], ['true', 'Oui']], s.headphones)}</div>` : ''}
-        <div class="setting"><span class="lbl">Vérifier avant de valider</span>
-          ${seg('check', [['false', 'Non'], ['true', 'Oui (aide)']], s.check)}
-          <p class="hint">${s.check ? 'Tu peux tester des notes par-dessus la musique, puis tu valides avec « C\'est la tonique ».' : s.answer === 'instrument' ? 'La première note que tu tiens (0,5 s) est ta réponse.' : 'La première touche que tu touches est ta réponse.'}</p></div>
+        <div class="setting"><span class="lbl">Aide : chercher pendant la musique</span>
+          ${seg('check', [['false', 'Non'], ['true', 'Oui']], s.check)}
+          <p class="hint">${s.check ? 'Le clavier (ou ton instrument) est disponible pendant que la musique joue : tu testes tes notes par-dessus, puis « C\'est la tonique ».' : 'Pendant la musique, rien à toucher. Une fois la musique arrêtée (« Arrêter la musique » en boucle, ou à la fin de l\'écoute), cherche de mémoire, puis « C\'est la tonique ».'}</p></div>
         <div class="setting"><label for="bpm">Tempo</label>
           <div class="row-gap">${seg('bpm', [[70, 'Lent'], [90, 'Moyen'], [115, 'Rapide']], s.bpm)}
           <input id="bpm" class="num" type="number" min="40" max="200" inputmode="numeric" value="${s.bpm}" aria-label="Tempo en battements par minute"><span class="muted">BPM</span></div></div>
@@ -3782,7 +3790,6 @@ const Piano = (() => {
 
   async function startTonicSession() {
     const s = { ...draft.settings };
-    if (s.answer === 'instrument' && !s.headphones && s.listen === 'loop') s.listen = 'twice';
     S = {
       type: 'tonic', title: 'Trouver la tonique', set: s, n: Math.max(1, Math.min(200, s.questions || 10)), i: 0,
       firstTry: 0, missed: {}, skipped: 0, times: [], token: 0, keyPc: null, mode: 'major', resScale: M.SCALES.major.notes,
@@ -3827,6 +3834,7 @@ const Piano = (() => {
       q.voiced = M.voiceProgression(S.t, q.chords);
       q.loopName = l.name;
       q.passBeats = 4 * q.chords.length;
+      if (s.context === 'band' && s.lead) q.lead = leadLine(q.chords.map((c) => c.d));
     }
     S.i++; S.q = q;
     renderPlayTonic();
@@ -3872,6 +3880,27 @@ const Piano = (() => {
     if (q.mel) { q.mel.forEach((n) => Piano.note(n.midi, at + n.beat * beat, n.dur * beat * 0.95, 0.85, rel)); return; }
     if (s.context === 'chords') { q.voiced.forEach((v, k) => { const t0 = at + 4 * k * beat; Piano.note(v.bass, t0, 4 * beat * 0.97, 0.42, rel); v.upper.forEach((m) => Piano.note(m, t0, 4 * beat * 0.97, 0.3, rel)); }); return; }
     bandPass(q.voiced, at, beat, s.groove);
+    if (q.lead) q.lead.forEach((n) => Piano.note(n.midi, at + n.beat * beat, n.dur * beat * 0.92, 0.72, 0.15));
+  }
+  /** Mélodie « chantée » sur la boucle : notes de l'accord sur les temps forts, pas conjoints entre deux, registre aigu. */
+  function leadLine(roots) {
+    const sc = S.resScale, semi = (i) => sc[M.mod(i, 7)] + 12 * Math.floor(i / 7);
+    const out = []; let cur = 7 + [0, 2, 4][Math.floor(Math.random() * 3)];
+    roots.forEach((d, b) => {
+      const cells = Melody.CELLS[Math.random() < 0.5 ? 3 : 4];
+      const cell = cells[Math.floor(Math.random() * cells.length)];
+      let beat = 0;
+      cell.forEach((dur, k) => {
+        if (k === 0 || beat === 2) {   // temps fort : la note de l'accord la plus proche
+          let best = cur, bd = 99;
+          for (let i = 4; i <= 13; i++) if ([0, 2, 4].includes(M.mod(i - d, 7)) && Math.abs(i - cur) < bd) { bd = Math.abs(i - cur); best = i; }
+          cur = best;
+        } else cur = Math.max(4, Math.min(13, cur + (Math.random() < 0.5 ? -1 : 1) * (Math.random() < 0.8 ? 1 : 2)));
+        out.push({ midi: S.t + semi(cur), beat: 4 * b + beat, dur });
+        beat += dur;
+      });
+    });
+    return out;
   }
   /** Un passage « groupe » : batterie, basse et accords, une mesure par accord. */
   function bandPass(voiced, at, beat, groove) {
@@ -3887,14 +3916,15 @@ const Piano = (() => {
     });
   }
 
-  function playTonic(replay = false) {
+  function playTonic(replay = false, explore = false) {
     const s = S.set, q = S.q;
     tonicStop();
     if (replay && !q.answered) q.helped = true;
+    q.explore = explore;
     const ctx = Piano.ctx, beat = 60 / s.bpm, passDur = q.passBeats * beat;
-    const passes = q.answered ? 1 : s.listen === 'loop' ? Infinity : s.listen === 'twice' ? 2 : 1;
+    const passes = explore ? Infinity : q.answered ? 1 : s.listen === 'loop' ? Infinity : s.listen === 'twice' ? 2 : 1;
     let at = ctx.currentTime + 0.15;
-    if (q.answered) {   // confirmation : la cadence, puis la musique une fois
+    if (q.answered && !explore) {   // confirmation : la cadence, puis la musique une fois
       M.voiceProgression(S.t, M.cadence(S.resScale)).forEach((c, k) => {
         const t = at + 2 * k * beat; Piano.note(c.bass, t, 2 * beat * 0.95, 0.5, releaseTime()); c.upper.forEach((m) => Piano.note(m, t, 2 * beat * 0.95, 0.36, releaseTime()));
       });
@@ -3916,7 +3946,7 @@ const Piano = (() => {
     const playing = now < q.endAt;
     if (!playing && q.phase === 'playing' && !q.stoppedShown) { q.stoppedShown = true; renderPlayTonic(); }
     if (q.answered || S.set.answer !== 'instrument' || !Mic.analyser) return;
-    if (playing && !S.set.headphones) return;   // sans écouteurs : le micro attend la fin de la musique
+    if (playing && (!S.set.headphones || !S.set.check)) return;   // sans écouteurs ou sans l'aide : le micro attend la fin de la musique
     const r = micDetect();
     const lvl = document.getElementById('lvl'); if (lvl) lvl.style.width = Math.min(100, Math.round((r ? r.rms : 0) * 400)) + '%';
     const t = performance.now();
@@ -3927,16 +3957,17 @@ const Piano = (() => {
     else if (q.lastMatch && t - q.lastMatch > 180) { q.hold = 0; q.lastMatch = 0; q.holdPc = null; }
     if (q.holdPc !== null && q.hold >= 500) {
       const heard = q.holdPc; q.hold = -1e9;   // une seule fois par note tenue
-      if (S.set.check) { q.heard = heard; renderPlayTonic(); }
-      else answerTonic(heard);
+      q.heard = heard; renderPlayTonic();
     }
   }
 
-  function answerTonic(pc) {
+  function answerTonic(pc, modeAns) {
     const q = S.q; if (q.answered) return;
-    q.answered = true; q.picked = pc; q.secs = (performance.now() - (q.t0 || performance.now())) / 1000;
-    q.correct = pc === S.keyPc;
-    q.relative = !q.correct && pc === M.mod(S.keyPc + (S.mode === 'minor' ? 3 : 9), 12);
+    if (S.set.modeSel === 'both' && !modeAns) { q.pendingPc = pc; q.picked = pc; renderPlayTonic(); return; }   // il reste à dire majeur ou mineur
+    q.answered = true; q.picked = pc; q.modeAns = modeAns || null; q.secs = (performance.now() - (q.t0 || performance.now())) / 1000;
+    q.tonicOk = pc === S.keyPc; q.modeOk = !modeAns || modeAns === S.mode;
+    q.correct = q.tonicOk && q.modeOk;
+    q.relative = !q.tonicOk && pc === M.mod(S.keyPc + (S.mode === 'minor' ? 3 : 9), 12);
     if (q.correct && !q.helped) { S.firstTry++; S.times.push(q.secs); }
     if (!q.correct) { const k = M.keyName(S.keyPc, S.mode); S.missed[k] = (S.missed[k] || 0) + 1; }
     playTonic();   // cadence de confirmation, puis la musique
@@ -3958,25 +3989,34 @@ const Piano = (() => {
       const degs = q.chords ? q.chords.map((c) => `<span class="prog-chord" style="--c:var(--deg${c.d})">${esc(c.name)}</span>`).join('') : '';
       $app.innerHTML = head + `
         <div class="stage"><span class="eyebrow">C'était</span><span class="key">${esc(M.keyName(S.keyPc, S.mode))}</span>
-          <p class="status ${q.correct ? 'good' : 'bad'}">${q.correct ? `✓ Tonique trouvée${q.helped ? ' (avec réécoute)' : ''} en ${q.secs.toFixed(1).replace('.', ',')} s` : q.relative ? `✗ Tu as choisi ${PC_NAMES[q.picked]} : la tonique du relatif ${S.mode === 'minor' ? 'majeur' : 'mineur'}. Même notes, autre centre.` : `✗ Tu as choisi ${PC_NAMES[q.picked]}.`}</p></div>
+          <p class="status ${q.correct ? 'good' : 'bad'}">${q.correct ? `✓ ${q.modeAns ? 'Tonique et mode trouvés' : 'Tonique trouvée'}${q.helped ? ' (avec réécoute)' : ''} en ${q.secs.toFixed(1).replace('.', ',')} s` : !q.tonicOk ? (q.relative ? `✗ Tu as choisi ${PC_NAMES[q.picked]} : la tonique du relatif ${S.mode === 'minor' ? 'majeur' : 'mineur'}. Même notes, autre centre.` : `✗ Tu as choisi ${PC_NAMES[q.picked]}.`) + (q.modeAns ? (q.modeOk ? ' Le mode était juste.' : ` Et c'était ${S.mode === 'minor' ? 'mineur' : 'majeur'}.`) : '') : `✗ Bonne tonique, mais c'était ${S.mode === 'minor' ? 'mineur' : 'majeur'}.`}</p></div>
         ${degs ? `<div class="dlg"><span class="dlg-who">Les accords</span><div class="prog-bars loop-grid"><span class="prog-bar">${degs}</span></div></div>` : ''}
         <p class="hint" style="text-align:center">La cadence confirme la tonalité, puis la musique repasse une fois.</p>
-        <div class="controls"><button class="ctl" data-act="tonic-replay">${ICON.cadence}Réécouter avec la cadence</button></div>
+        <div class="controls"><button class="ctl" data-act="tonic-replay">${ICON.cadence}Réécouter avec la cadence</button>
+          <button class="ctl" data-act="tonic-explore" aria-pressed="${!!q.explore}">${ICON.kbd}${q.explore ? 'Arrêter la boucle' : 'Rejouer avec le clavier'}</button></div>
+        ${q.explore ? `${kbd((pc) => (pc === S.keyPc ? ' ok' : pc === q.picked && !q.tonicOk ? ' no' : ''))}
+          <p class="hint" style="text-align:center">La musique tourne en boucle : joue la tonique (en vert) et les autres notes par-dessus pour entendre la différence.${q.picked != null && !q.tonicOk ? ' En rouge : ta réponse.' : ''}</p>` : ''}
         <div class="actions"><button class="btn secondary" data-act="home">Quitter</button><button class="btn" data-act="tonic-next">${S.i >= S.n ? 'Voir le bilan' : 'Question suivante'}</button></div>`;
       return;
     }
-    const micWait = s.answer === 'instrument' && !s.headphones && playing;
+    // Sans l'aide : pendant la musique, pas de clavier (ni de son) et le micro n'écoute pas ; on répond une fois la musique arrêtée.
+    const canAnswer = q.phase !== 'ready' && (s.check || !playing);
+    const micListens = s.answer === 'instrument' && canAnswer && (!playing || s.headphones);
+    const choice = s.answer === 'buttons' ? q.picked : q.heard;
+    const loopStop = q.phase === 'playing' && playing && s.listen === 'loop' && (!s.check || (s.answer === 'instrument' && !s.headphones));
     $app.innerHTML = head + `
       <div class="stage"><span class="eyebrow">Trouver la tonique · ${{ melody: 'mélodie', chords: 'accords', band: 'groupe' }[s.context]}</span>
         <span class="key">?</span>
-        <p class="status">${q.phase === 'ready' ? 'Écoute, puis trouve la tonique.' : playing ? (micWait ? 'Écoute… tu joueras quand la musique s\'arrête.' : 'Écoute… trouve la tonique.') : 'À toi : quelle est la tonique ?'}</p></div>
-      ${s.answer === 'buttons' ? kbd((pc) => (q.picked === pc ? ' sel' : ''))
-        : `<div class="mic-panel"><span class="mic-icon">${ICON.mic}</span><span>${s.check ? (q.heard !== null ? '✓ Note entendue : valide si c\'est ta réponse, ou joue-en une autre.' : 'Cherche la tonique sur ton instrument, tiens la note.') : 'Joue la tonique et tiens-la un instant : la première note tenue est ta réponse.'}</span><div class="level"><i id="lvl"></i></div></div>`}
-      <div class="actions">
+        <p class="status">${q.phase === 'ready' ? 'Écoute, puis trouve la tonique.' : playing && !canAnswer ? (s.listen === 'loop' ? 'Écoute… arrête la musique quand tu es prêt.' : 'Écoute… tu répondras à la fin.') : playing ? 'Cherche la tonique par-dessus la musique.' : 'À toi : quelle est la tonique ?'}</p></div>
+      ${!canAnswer ? '' : s.answer === 'buttons' ? kbd((pc) => (q.picked === pc ? ' sel' : ''))
+        : `<div class="mic-panel"><span class="mic-icon">${ICON.mic}</span><span>${!micListens ? 'Mets des écouteurs pour jouer pendant la musique, ou attends qu\'elle s\'arrête.' : q.heard !== null ? '✓ Note entendue : valide si c\'est ta réponse, ou joue-en une autre.' : 'Cherche la tonique sur ton instrument, tiens la note un instant.'}</span><div class="level"><i id="lvl"></i></div></div>`}
+      ${q.pendingPc != null ? `<div class="mode-ask"><b>Tonique choisie. Majeur ou mineur ?</b><div class="actions"><button class="btn" data-act="tonic-mode" data-v="major">Majeur</button><button class="btn" data-act="tonic-mode" data-v="minor">Mineur</button></div></div>` : ''}
+      ${q.pendingPc != null ? '' : `<div class="actions">
         ${q.phase === 'ready' ? '<button class="btn wide" data-act="tonic-play" style="grid-column:1/-1">Écouter</button>'
-          : `${s.listen !== 'loop' ? `<button class="btn secondary" data-act="tonic-again" ${playing ? 'disabled' : ''}>Réécouter</button>` : ''}
-             ${s.check ? `<button class="btn" data-act="tonic-ok" ${(s.answer === 'buttons' ? q.picked : q.heard) === null ? 'disabled' : ''} ${s.listen === 'loop' ? 'style="grid-column:1/-1"' : ''}>C'est la tonique</button>` : ''}`}
-      </div>`;
+          : loopStop ? '<button class="btn wide" data-act="tonic-stop" style="grid-column:1/-1">Arrêter la musique</button>'
+          : `${!playing ? `<button class="btn secondary" data-act="tonic-again">${s.listen === 'loop' ? 'Relancer la musique' : 'Réécouter'}</button>` : ''}
+             ${canAnswer ? `<button class="btn" data-act="tonic-ok" ${choice === null ? 'disabled' : ''} ${playing ? 'style="grid-column:1/-1"' : ''}>C'est la tonique</button>` : ''}`}
+      </div>`}`;
   }
 
   function renderSetupImprov() {
@@ -4458,9 +4498,20 @@ const Piano = (() => {
   }
 
   /* ---------- Événements ---------- */
+  // Touches de clavier : le son part dès que le doigt touche l'écran (pointerdown), pas au relâchement (click).
+  const FAST_ACTS = new Set(['tonic-key', 'key', 'play-chord']);
+  $app.addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b || b.disabled || !FAST_ACTS.has(b.dataset.act)) return;
+    b.dataset.pd = '1'; b.click();
+  });
   $app.addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
     if (!b || b.disabled) return;
+    if (FAST_ACTS.has(b.dataset.act)) {
+      if (b.dataset.pd) { delete b.dataset.pd; b.dataset.fast = Date.now(); }
+      else if (b.dataset.fast && Date.now() - Number(b.dataset.fast) < 1000) return;   // déjà joué au toucher
+    }
     const v = b.dataset.v;
     switch (b.dataset.act) {
       case 'home': try { history.back(); } catch (err) {} goHome(); break;
@@ -4474,15 +4525,21 @@ const Piano = (() => {
       case 'loop-go': S.played = true; startLoop(); break;
       case 'tgt-go': startTargets(); break;
       case 'tonic-play': playTonic(); break;
-      case 'tonic-again': playTonic(true); break;
+      case 'tonic-again': playTonic(S.set.listen !== 'loop'); break;   // réécouter (une/deux fois) = aide ; relancer la boucle = libre
+      case 'tonic-stop': if (S.q) { tonicStop(); S.q.endAt = Piano.ctx.currentTime; renderPlayTonic(); } break;
       case 'tonic-replay': playTonic(); break;
+      case 'tonic-explore': if (S.q.explore) { tonicStop(); S.q.explore = false; renderPlayTonic(); } else playTonic(false, true); break;
       case 'tonic-key': {
-        const pc = Number(v), q = S.q; if (!q || q.answered || q.phase === 'ready') break;
-        Piano.note(60 + pc, Piano.ctx.currentTime + 0.02, 0.9, 0.8, releaseTime());   // la note sonne par-dessus la musique ; le clavier va de Do4 à Si4, comme un vrai piano
-        if (S.set.check) { q.picked = pc; renderPlayTonic(); } else answerTonic(pc);
+        const pc = Number(v), q = S.q;
+        if (q && q.answered) { if (q.explore) Piano.note(60 + pc, Piano.ctx.currentTime + 0.005, 0.9, 0.8, releaseTime()); break; }   // après la réponse : jouer librement sur la musique
+        if (!q || q.phase === 'ready') break;
+        if (!S.set.check && Piano.ctx.currentTime < q.endAt) break;   // sans l'aide : pas de clavier pendant la musique
+        Piano.note(60 + pc, Piano.ctx.currentTime + 0.005, 0.9, 0.8, releaseTime());   // le clavier va de Do4 à Si4, comme un vrai piano
+        q.picked = pc; renderPlayTonic();
         break;
       }
       case 'tonic-ok': if (S.q && !S.q.answered) answerTonic(S.set.answer === 'buttons' ? S.q.picked : S.q.heard); break;
+      case 'tonic-mode': if (S.q && !S.q.answered && S.q.pendingPc != null) answerTonic(S.q.pendingPc, v); break;
       case 'tonic-next': tonicStop(); if (S.i >= S.n) finish(); else nextTonicQuestion(false); break;
       case 'tgt-stop': if (S.total === Infinity && S.set.mic) { closeSlot(S.abs); finishTargets(); } else { targetStop(); Piano.stopAll(); S.abs = -1; S.done = 0; S.hits = 0; renderPlayTargets(); } break;
       case 'tgt-again': S.finished = false; startTargets(); break;   // même boucle, même tonalité : on relance tout de suite
