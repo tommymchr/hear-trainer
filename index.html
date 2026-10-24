@@ -454,6 +454,54 @@ p { margin: 0; }
 .mic-test-msg.ok { color: var(--good); }
 .tg-end { display: flex; flex-direction: column; gap: 8px; }
 
+/* ---------- Trouver la tonique : clavier d'une octave ---------- */
+.tk { position: relative; height: 150px; display: flex; user-select: none; touch-action: manipulation; }
+.tk-w { flex: 1; border: 1px solid var(--line); border-radius: 0 0 10px 10px; background: #fbfbf8; color: #3b4150; margin-right: -1px;
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 10px; font-size: .78rem; font-weight: 700; }
+.tk-b { position: absolute; top: 0; width: 11%; height: 60%; border-radius: 0 0 7px 7px; background: #1d222c; color: #e8eaef; border: 1px solid #0c0e12; z-index: 2;
+  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; font-size: .62rem; font-weight: 700; }
+.tk-w:active { background: #e8dcc0; } .tk-b:active { background: #3a4252; }
+.tk-w.sel { background: var(--accent-soft); box-shadow: inset 0 -6px 0 var(--accent); }
+.tk-b.sel { background: var(--accent); }
+
+/* ---------- Progrès par exercice ---------- */
+.prog-count { margin-top: -8px; }
+.ex-progs { display: flex; flex-direction: column; gap: 8px; }
+.ex-prog { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.ex-prog summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 12px 14px; }
+.ex-prog summary::-webkit-details-marker { display: none; }
+.ex-prog .glyph { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; font-family: var(--font-display); font-weight: 800; }
+.ep-name { min-width: 0; display: flex; flex-direction: column; }
+.ep-name b { font-size: .95rem; }
+.ep-name small { color: var(--muted); font-size: .78rem; }
+.ep-pct { font-family: var(--font-display); font-weight: 800; font-size: 1.1rem; font-variant-numeric: tabular-nums; min-width: 3.2em; text-align: right; }
+.spark { color: var(--c); }
+.ep-body { display: flex; flex-direction: column; gap: 8px; padding: 0 14px 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.ep-weak { display: flex; flex-direction: column; gap: 6px; }
+.ep-body .link-btn { align-self: flex-start; padding: 4px 0; }
+.focus-banner { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-radius: var(--radius); background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); font-size: .9rem; }
+.focus-banner b { color: var(--accent); }
+.ex-prog .glyph.tinted { background: color-mix(in srgb, var(--c) 16%, var(--surface)); color: var(--c); box-shadow: inset 0 -3px 0 var(--c); }
+
+/* ---------- Régularité, parcours, montée de niveau ---------- */
+.goal { display: flex; align-items: center; gap: 14px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.panel .goal { border: 0; padding: 0; background: none; }
+.goal-ring { width: 64px; height: 64px; flex: none; transform: rotate(-90deg); }
+.goal-ring .ring-bg { fill: none; stroke: var(--line); stroke-width: 8; }
+.goal-ring .ring-fg { fill: none; stroke: var(--accent); stroke-width: 8; stroke-linecap: round; }
+.goal-txt { display: flex; flex-direction: column; gap: 1px; }
+.goal-txt b { font-family: var(--font-display); font-size: 1.05rem; }
+.goal-txt span { font-weight: 700; font-variant-numeric: tabular-nums; }
+.goal-txt .muted { font-weight: 600; font-size: .85rem; }
+.step-meter { margin-top: 6px; height: 6px; }
+.step-meter i { background: var(--c); }
+.step-lbl { font-size: .78rem !important; }
+.level-up { gap: 8px; border-color: var(--good); background: var(--good-soft); }
+.level-up > b { color: var(--good); font-family: var(--font-display); font-size: 1.1rem; }
+.slots.many { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; max-width: 360px; margin: 0 auto; }
+.slots.many .slot { min-width: 0; text-align: center; }
+.loop-now { box-sizing: border-box; }
+
 </style>
 </head>
 <body>
@@ -1213,11 +1261,12 @@ const Piano = (() => {
   const BUILTIN = [
     { id: 'maj', glyph: 'I', title: 'Fonctions — Majeur', sub: 'Cadence I–IV–V–I, puis une note de la gamme majeure', mode: 'major', notes: M.SCALES.major.notes },
     { id: 'min', glyph: 'i', title: 'Fonctions — Mineur', sub: 'Cadence i–iv–v–i, puis une note de la gamme mineure naturelle', mode: 'minor', notes: M.SCALES.minor.notes },
+    { id: 'tonic', type: 'tonic', glyph: '⌂', title: 'Trouver la tonique', sub: 'Sans cadence : une mélodie, des accords ou un groupe, retrouve la tonique à l\'oreille' },
     { id: 'custom', glyph: '♯', title: 'Exercice personnalisé', sub: 'Choisis toi-même les notes parmi les 12', mode: 'major', notes: [0, 7], custom: true },
   ];
   const CHORD_DEFAULTS = {
     tonalite: 'random-not-c', changeKey: 'exercise', questions: 20, help: true, cadenceEach: true,
-    articulation: 'legato', showKey: true, seqLength: 1, seqKind: 'random', chordNotation: 'roman', voicing: 'block',
+    articulation: 'legato', showKey: true, seqLength: 1, seqKind: 'random', chordNotation: 'roman', voicing: 'block', listen: 'once', groove: 'pop', bpm: 90,
   };
   const ALL7 = [0, 1, 2, 3, 4, 5, 6];
   const CHORD_BUILTIN = [
@@ -1320,7 +1369,7 @@ const Piano = (() => {
   function pushScreen() { try { history.pushState({ s: screen }, ''); } catch (e) {} }
 
   function goHome() {
-    improvStop(); loopStop(); targetStop(); micTestStop();
+    improvStop(); loopStop(); targetStop(); tonicStop(); chordGridStop(); micTestStop();
     micStop();
     if (S && CUR && !CUR.recorded) recordSession(true);
     Piano.stopAll(); S = null; screen = HOME.cat ? 'cat' : 'home'; renderHome();
@@ -1330,6 +1379,8 @@ const Piano = (() => {
   let CUR = null; // séance en cours : { exId, start, recorded }
   function beginSession() {
     CUR = { exId: draft.ex.id, start: Date.now(), recorded: false };
+    // demande au navigateur de garder les données de l'app (historique, réglages) sans les effacer de lui-même
+    if (!Store.get('persistAsked', false)) { Store.set('persistAsked', true); try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {} }
     Store.set('lastEx', draft.ex.id);
   }
   /** Enregistre la séance dans l'historique. partial = séance quittée avant la fin. */
@@ -1345,19 +1396,21 @@ const Piano = (() => {
     if (partial && dur < 15 && !total) return;
     const weak = Object.entries(S.missed || {}).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n]) => weakLabel(n));
     const hist = Store.get('history', []);
-    hist.push({ date: Date.now(), exId: CUR.exId, title: S.title, type: S.type || 'notes', score, total, skipped: S.skipped || 0, dur, partial, weak,
+    const avg = S.times && S.times.length ? S.times.reduce((a, b) => a + b, 0) / S.times.length : null;
+    hist.push({ date: Date.now(), exId: CUR.exId, title: S.title, type: S.type || 'notes', score, total, skipped: S.skipped || 0, dur, partial, weak, avg,
+      level: S.set && (S.set.level || S.set.count) || null, levelKey: levelKeyOf(S.type, S.set),
       mode: S.mode, notes: S.notes, degrees: S.degrees, missed: S.missed });
     Store.set('history', hist.slice(-500));
   }
   function weakLabel(n) {
     if (S.type === 'chords') return chordLabel(Number(n));
-    if (S.type === 'instrument' || S.type === 'sing' || S.type === 'targets') return String(n);
+    if (S.type === 'instrument' || S.type === 'sing' || S.type === 'targets' || S.type === 'tonic') return String(n);
     return M.label(Number(n), (S.set && S.set.notation) || 'degres');
   }
 
   /* ---------- Catégories et parcours ---------- */
   const CATS = [
-    { id: 'deg', deg: 0, glyph: '1', name: 'Degrés', step: 'Reconnaître les degrés', sub: 'Une note après la cadence', ids: ['maj', 'min', 'custom'], types: ['notes'] },
+    { id: 'deg', deg: 0, glyph: '1', name: 'Degrés', step: 'Reconnaître les degrés', sub: 'Une note après la cadence', ids: ['maj', 'min', 'custom', 'tonic'], types: ['notes', 'tonic'] },
     { id: 'acc', deg: 3, glyph: 'IV', name: 'Accords', step: 'Reconnaître les accords', sub: 'Degrés d\'accords et enchaînements', ids: ['ch-maj', 'ch-min', 'ch-custom'], types: ['chords'] },
     { id: 'mel', deg: 2, glyph: '♫', name: 'Mélodies', step: 'Retenir une mélodie', sub: 'Dictée, aux boutons ou à l\'instrument', ids: ['mel', 'mel-inst'], types: ['melody'] },
     { id: 'voi', deg: 1, glyph: '♩', name: 'Voix & instrument', step: 'Chanter et jouer', sub: 'Ta voix, ta guitare, ton mélodica', ids: ['sing', 'sing-repeat', 'inst'], types: ['sing', 'instrument'] },
@@ -1445,6 +1498,7 @@ const Piano = (() => {
     return `
       <header class="top"><div class="brand"><span class="brand-mark">Hear<span>·</span>Trainer</span></div></header>
       ${last ? `<button class="resume" data-act="open" data-id="${last.id}"><span><small>Reprendre</small><b>${esc(last.title)}</b></span><span class="play" aria-hidden="true">▶</span></button>` : ''}
+      ${goalRingHtml()}
       <section class="section"><span class="eyebrow">Proposé pour toi</span>
         <div class="cards">${sug.map(({ ex, why }) => { const c = catOf(ex.id); return `
           <button class="card" data-act="open" data-id="${ex.id}" style="--c:var(--deg${c ? c.deg : 6})">
@@ -1476,7 +1530,167 @@ const Piano = (() => {
       <ol class="path">${CATS.map((c, k) => `
         <li class="step" style="--c:var(--deg${c.deg})"><span class="step-dot">${k + 1}</span>
           <button class="step-card" data-act="cat" data-v="${c.id}" data-step="1"><b>${esc(c.step)}</b><span class="s">${esc(c.sub)}</span>
-            <span class="chips">${catExercises(c).map((e) => `<span>${esc(e.title)}</span>`).join('')}</span></button></li>`).join('')}</ol>`;
+            ${(() => { const sp = stepProgress(c); return `<span class="meter step-meter"><i style="width:${sp.pct}%"></i></span><span class="s step-lbl">${esc(sp.label)}</span>`; })()}
+            <span class="chips">${catExercises(c).map((e) => `<span>${esc(e.title)}</span>`).join('')}</span></button></li>`).join('')}</ol>
+      <p class="hint">La barre suit ta réussite récente dans l'étape ; elle se remplit vraiment à partir de 5 séances.</p>`;
+  }
+
+  /* ---------- Montée de niveau proposée ---------- */
+  // Pour chaque exercice : réglages qui rendent l'exercice plus difficile, dans l'ordre (le premier pas encore au maximum est proposé).
+  const LADDERS = {
+    notes: [{ key: 'octaves', steps: [[1, '1 octave'], [2, '2 octaves'], [3, '3 octaves']] }],
+    chords: [{ key: 'seqLength', steps: [[1, '1 accord'], [2, 'suites de 2 accords'], [3, 'suites de 3 accords'], [4, 'suites de 4 accords'], [6, 'grilles de 6 accords'], [8, 'grilles de 8 accords']] }],
+    melody: [{ key: 'level', steps: [['easy', 'Facile'], ['medium', 'Moyen'], ['hard', 'Difficile']] }],
+    sing: [{ key: 'seqLen', steps: [[1, '1 degré'], [2, 'suites de 2'], [3, 'suites de 3'], [4, 'suites de 4']] }],
+    tonic: [{ key: 'level', steps: [['easy', 'Facile'], ['medium', 'Moyen'], ['hard', 'Difficile']] },
+      { key: 'listen', steps: [['loop', 'écoute en boucle'], ['twice', 'écoute deux fois'], ['once', 'écoute une seule fois']] }],
+    targets: [{ key: 'help', steps: [[true, 'avec la note'], [false, 'sans la note']] },
+      { key: 'strict', steps: [[false, 'pendant l\'accord'], [true, 'sur le premier temps']] }],
+  };
+  const ladderOf = (type) => LADDERS[type || 'notes'];
+  /** Clé de niveau d'une séance : les valeurs des réglages de difficulté (ex. « level=medium|listen=loop »). */
+  function levelKeyOf(type, set) {
+    const L = ladderOf(type); if (!L || !set) return null;
+    return L.map((l) => `${l.key}=${set[l.key]}`).join('|');
+  }
+  /** Après une séance : 3 séances d'affilée à 80 % ou plus au même niveau → proposer le cran suivant. */
+  function levelUpOffer() {
+    if (!S || !CUR) return null;
+    const L = ladderOf(S.type); if (!L) return null;
+    const key = levelKeyOf(S.type, S.set);
+    const last = Store.get('history', []).filter((h) => h.exId === CUR.exId && !h.partial && h.total >= 3).slice(-3);
+    if (last.length < 3 || !last.every((h) => h.levelKey === key && h.score / h.total >= 0.8)) return null;
+    for (const l of L) {
+      const i = l.steps.findIndex(([v]) => String(v) === String(S.set[l.key]));
+      if (i >= 0 && i < l.steps.length - 1) return { key: l.key, value: l.steps[i + 1][0], from: l.steps[i][1], to: l.steps[i + 1][1], pcts: last.map((h) => Math.round((100 * h.score) / h.total)) };
+    }
+    return null;
+  }
+  function levelUpHtml() {
+    const o = levelUpOffer(); if (!o) return '';
+    S.levelOffer = o;
+    return `<div class="panel level-up"><b>Tu maîtrises ce niveau !</b>
+      <span>${o.pcts.join(' %, ')} % sur tes 3 dernières séances (${esc(o.from)}). Passer à : <b>${esc(o.to)}</b> ?</span>
+      <div class="actions"><button class="btn secondary" data-act="lvl-no">Plus tard</button><button class="btn" data-act="lvl-yes">Passer au niveau suivant</button></div></div>`;
+  }
+  /** Applique le cran suivant aux réglages gardés de l'exercice, puis rouvre ses réglages. */
+  function applyLevelUp() {
+    const o = S && S.levelOffer, id = CUR && CUR.exId; if (!o || !id) return;
+    const ex = findEx(id);
+    if (ex && ex.saved) { const list = savedList(); const i = list.findIndex((e) => e.id === id); if (i >= 0) { list[i].settings = { ...list[i].settings, [o.key]: o.value }; Store.set('saved', list); } }
+    else Store.set('settings:' + id, { ...Store.get('settings:' + id, {}), [o.key]: o.value });
+    goHome(); openSetup(id);
+  }
+
+  /* ---------- Régularité : jours d'affilée, objectif du jour ---------- */
+  const goalMin = () => Store.get('goalMin', 15);
+  function todayMinutes() { const k = dayKey(Date.now()); return Store.get('history', []).filter((h) => dayKey(h.date) === k).reduce((a, h) => a + (h.dur || 0), 0) / 60; }
+  /** Jours d'affilée avec au moins une séance (aujourd'hui compris, ou jusqu'à hier si pas encore joué aujourd'hui). */
+  function streak() {
+    const days = new Set(Store.get('history', []).map((h) => dayKey(h.date)));
+    const d = new Date(); d.setHours(12, 0, 0, 0);
+    if (!days.has(dayKey(d))) d.setDate(d.getDate() - 1);
+    let n = 0; while (days.has(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  function goalRingHtml() {
+    const m = todayMinutes(), g = goalMin(), p = Math.min(1, m / g), st = streak(), C = 2 * Math.PI * 34;
+    return `<div class="goal">
+      <svg viewBox="0 0 80 80" class="goal-ring" aria-hidden="true"><circle cx="40" cy="40" r="34" class="ring-bg"/><circle cx="40" cy="40" r="34" class="ring-fg" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - p)).toFixed(1)}"/></svg>
+      <div class="goal-txt"><b>${p >= 1 ? 'Objectif atteint !' : 'Objectif du jour'}</b><span>${Math.floor(m)} / ${g} min</span>
+        <span class="muted">${st ? `${st} jour${st > 1 ? 's' : ''} d'affilée` : 'Commence une série aujourd\'hui'}</span></div>
+    </div>`;
+  }
+  /** Avancement d'une étape du parcours : réussite récente, pondérée tant qu'il y a peu de séances. */
+  function stepProgress(c) {
+    const st = catStats(c);
+    if (!st.n || st.r === null) return { pct: 0, n: st.n, label: st.n ? 'Commencé' : 'Pas commencé' };
+    const pct = Math.round(st.r * 100 * Math.min(1, st.n / 5));
+    return { pct, n: st.n, label: `${Math.round(st.r * 100)} % de réussite · ${st.n} séance${st.n > 1 ? 's' : ''}` };
+  }
+
+  /* ---------- Progrès par exercice : réussite, courbe, points faibles ---------- */
+  /** Séances d'un exercice (les plus anciennes d'abord). */
+  const exHistory = (id) => Store.get('history', []).filter((h) => h.exId === id);
+  /** Points faibles : ce qui a été le plus raté sur les 5 dernières séances (clés brutes + étiquettes lisibles). */
+  function weakPoints(id) {
+    const list = exHistory(id).slice(-5), raw = {}, lab = {};
+    list.forEach((h) => {
+      Object.entries(h.missed || {}).forEach(([k, n]) => { raw[k] = (raw[k] || 0) + n; });
+      (h.weak || []).forEach((w, i) => { lab[w] = (lab[w] || 0) + 3 - i; });
+    });
+    return { raw: Object.entries(raw).sort((a, b) => b[1] - a[1]), labels: Object.entries(lab).sort((a, b) => b[1] - a[1]).map(([w]) => w).slice(0, 4) };
+  }
+  /** Peut-on lancer une séance ciblée sur les points faibles de cet exercice ? */
+  function focusable(id) {
+    const ex = findEx(id); if (!ex) return false;
+    return (!ex.type && !isChords(ex)) || isChords(ex) || (ex.type === 'sing' && id === 'sing') || ex.type === 'targets';
+  }
+  /** Ouvre les réglages d'une séance centrée sur les points faibles (notes / accords / degrés / type de cible). */
+  function openFocus(id) {
+    const ex = findEx(id), wp = weakPoints(id), keys = wp.raw.slice(0, 3).map(([k]) => k);
+    if (!ex || !keys.length) return;
+    if (isChords(ex)) {
+      const scale = ex.custom ? (Store.get('custom-chords-draft', null) || { scale: 'major' }).scale : ex.scale;
+      openSetup('ch-custom');
+      draft.scale = scale; draft.degrees = [...new Set([0, 4, ...keys.map(Number)])].sort((a, b) => a - b);
+      const tri = M.scaleTriads(M.SCALES[scale].notes);
+      draft.focus = keys.map((k) => tri[Number(k)].name).join(', ');
+    } else if (ex.type === 'sing') {
+      openSetup('sing');
+      const sc = singScaleNotes(draft.settings);
+      const idx = keys.map((lab) => sc.findIndex((n) => M.label(n, 'degres') === lab)).filter((i) => i >= 0);
+      draft.settings.degrees = [...new Set([0, ...idx])].sort((a, b) => a - b);
+      draft.focus = keys.join(', ');
+    } else if (ex.type === 'targets') {
+      const count = { 0: 0, 1: 0, 2: 0, 3: 0 };
+      wp.raw.forEach(([k, n]) => { TYPE_LBL.forEach((t, i) => { if (k.includes('(' + t + ')')) count[i] += n; }); });
+      const worst = Object.entries(count).sort((a, b) => b[1] - a[1])[0][0];
+      openSetup('targets');
+      draft.settings.target = ['root', 'third', 'fifth', 'seventh'][worst];
+      draft.focus = TYPE_LBL[worst] + 's';
+    } else {
+      const mode = ex.mode || 'major';
+      openSetup('custom');
+      draft.mode = mode; draft.notes = [...new Set([0, 7, ...keys.map(Number)])].sort((a, b) => a - b);
+      draft.focus = keys.map((k) => M.label(Number(k), 'degres')).join(', ');
+    }
+    renderSetup();
+  }
+  function sparkline(vals) {
+    if (vals.length < 2) return '';
+    const w = 64, h = 26, step = w / (vals.length - 1);
+    const pts = vals.map((v, i) => `${(i * step).toFixed(1)},${(h - 3 - v * (h - 6)).toFixed(1)}`);
+    const last = pts[pts.length - 1].split(',');
+    return `<svg class="spark" viewBox="-3 0 ${w + 6} ${h}" width="${w + 6}" height="${h}" aria-hidden="true"><polyline points="${pts.join(' ')}" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${last[0]}" cy="${last[1]}" r="3" fill="currentColor"/></svg>`;
+  }
+  function exerciseProgressHtml() {
+    const all = Store.get('history', []).filter((h) => h.exId);
+    const ids = [...CATS.flatMap((c) => c.ids), ...savedList().map((e) => e.id)].filter((id) => all.some((h) => h.exId === id));
+    if (!ids.length) return '<p class="muted panel">Le détail apparaîtra ici après tes premières séances.</p>';
+    return ids.map((id) => {
+      const ex = findEx(id); if (!ex) return '';
+      const c = catOf(id) || (isChords(ex) ? CATS[1] : CATS[0]);
+      const hs = exHistory(id), scored = hs.filter((h) => h.total > 0);
+      const recent = scored.slice(-10), r = rate(recent);
+      const pct = r === null ? null : Math.round(r * 100);
+      const best = scored.reduce((b, h) => (!b || h.score / h.total > b.score / b.total ? h : b), null);
+      const times = hs.filter((h) => h.avg).slice(-10);
+      const avg = times.length ? times.reduce((a, h) => a + h.avg, 0) / times.length : null;
+      const mins = Math.round(hs.reduce((a, h) => a + (h.dur || 0), 0) / 60);
+      const wp = weakPoints(id);
+      return `<details class="ex-prog" style="--c:var(--deg${c.deg})">
+        <summary><span class="glyph tinted">${esc(ex.glyph || '★')}</span><span class="ep-name"><b>${esc(ex.title)}</b><small>${hs.length} séance${hs.length > 1 ? 's' : ''}${mins ? ` · ${mins} min` : ''}</small></span>
+          ${sparkline(recent.map((h) => h.score / h.total))}<span class="ep-pct">${pct === null ? '—' : pct + ' %'}</span></summary>
+        <div class="ep-body">
+          ${pct === null ? '<p class="hint">Pas de score pour cet exercice : seules les minutes comptent.</p>' : `<p class="hint">Réussite sur ${recent.length > 1 ? `tes ${recent.length} dernières séances` : 'ta séance'} : <b>${pct} %</b>${best ? ` · meilleure séance : <b>${best.score} / ${best.total}</b>` : ''}</p>`}
+          ${avg !== null ? `<p class="hint">Temps moyen : <b>${avg.toFixed(1).replace('.', ',')} s</b></p>` : ''}
+          ${wp.labels.length ? `<div class="ep-weak"><span class="hint">Points faibles (5 dernières séances) :</span><div class="weak">${wp.labels.map((w) => `<span>${esc(w)}</span>`).join('')}</div></div>`
+            : scored.length ? '<p class="hint">Aucun point faible sur tes dernières séances.</p>' : ''}
+          ${wp.labels.length && focusable(id) ? `<button class="btn secondary" data-act="focus" data-id="${id}">Travailler mes points faibles</button>` : ''}
+          <button class="link-btn" data-act="open" data-id="${id}">Ouvrir l'exercice ›</button>
+        </div></details>`;
+    }).join('');
   }
 
   function renderTabProgress() {
@@ -1487,11 +1701,23 @@ const Piano = (() => {
       return `<div class="prog-row" style="--c:var(--deg${c.deg})">
         <div class="prog-head"><b>${esc(c.name)}</b><span class="prog-pct">${pct === null ? '—' : pct + ' %'}</span></div>
         <div class="meter"><i style="width:${pct || 0}%"></i></div>
-        <span class="hint">${st.n ? `${c.id === 'imp' ? 'Réponses conclues sur la tonique' : 'Réussite du premier coup'}, ${st.n > 10 ? `sur tes 10 dernières séances (${st.n} au total)` : `sur ${st.n > 1 ? 'tes ' + st.n + ' séances' : 'ta séance'}`} ${trend}` : 'Pas encore de séance.'}</span></div>`;
+        <span class="hint">${st.n ? `${c.id === 'imp' ? 'Cibles touchées et réponses conclues sur la tonique' : 'Réussite du premier coup'}, ${st.n > 10 ? `sur tes 10 dernières séances (${st.n} au total)` : `sur ${st.n > 1 ? 'tes ' + st.n + ' séances' : 'ta séance'}`} ${trend}` : 'Pas encore de séance.'}</span></div>`;
     }).join('');
+    const hist = Store.get('history', []);
+    const since = hist.length ? new Date(hist[0].date).toLocaleDateString('fr-BE', { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+    const totalMin = Math.round(hist.reduce((a, h) => a + (h.dur || 0), 0) / 60);
     return `
       <header class="top"><h1 class="tab-title">Progrès</h1></header>
-      <section class="section"><span class="eyebrow">Réussite par catégorie</span><div class="panel">${rows}</div></section>`;
+      <p class="hint prog-count">${hist.length ? `<b>${hist.length} séance${hist.length > 1 ? 's' : ''}</b> enregistrée${hist.length > 1 ? 's' : ''} depuis le ${since}${totalMin ? ` · ${totalMin} minutes d'entraînement` : ''}.` : 'Aucune séance enregistrée pour l\'instant.'}</p>
+      <section class="section"><span class="eyebrow">Régularité</span><div class="panel">
+        ${goalRingHtml()}
+        <div class="setting"><span class="lbl">Durée de l'objectif</span><div class="seg">${['10', '15', '20', '30'].map((v) => `<button data-act="goal" data-v="${v}" aria-pressed="${String(goalMin()) === v}">${v} min</button>`).join('')}</div></div>
+      </div></section>
+      <section class="section"><span class="eyebrow">Réussite par catégorie</span><div class="panel">${rows}</div></section>
+      <section class="section"><span class="eyebrow">Par exercice</span><div class="ex-progs">${exerciseProgressHtml()}</div></section>
+      ${hist.length ? `<section class="section"><span class="eyebrow">Tes 10 dernières séances</span><div class="history">${hist.slice(-10).reverse().map((h) => `
+        <div class="row"><span>${esc((findEx(h.exId) || {}).title || h.title)} <span class="muted">· ${new Date(h.date).toLocaleDateString('fr-BE', { day: 'numeric', month: 'short' })}${h.dur ? ` · ${Math.max(1, Math.round(h.dur / 60))} min` : ''}</span></span>
+        <b>${h.total ? `${h.score} / ${h.total}` : '—'}</b></div>`).join('')}</div></section>` : ''}`;
   }
 
   function renderCategory() {
@@ -1525,6 +1751,11 @@ const Piano = (() => {
     if (!ex) return renderHome();
     if (ex.type === 'improv') {
       draft = { ex, settings: { ...IMPROV_DEFAULTS, ...Store.get('settings:' + id, {}) } };
+      screen = 'setup'; pushScreen();
+      return renderSetup();
+    }
+    if (ex.type === 'tonic') {
+      draft = { ex, settings: { ...TONIC_DEFAULTS, ...Store.get('settings:' + id, {}) } };
       screen = 'setup'; pushScreen();
       return renderSetup();
     }
@@ -1581,9 +1812,13 @@ const Piano = (() => {
   const seg = (key, opts, val) => `<div class="seg">${opts.map(([v, l]) =>
     `<button data-act="set" data-k="${key}" data-v="${v}" aria-pressed="${String(v) === String(val)}">${l}</button>`).join('')}</div>`;
 
-  const usesMic = (ex, st) => ex.type === 'instrument' || ex.type === 'sing' || ex.type === 'improv' || (ex.type === 'targets' && st.mic !== false) || (ex.type === 'melody' && st.answerMode === 'instrument');
+  const usesMic = (ex, st) => (ex.type === 'tonic' && st.answer === 'instrument') || ex.type === 'instrument' || ex.type === 'sing' || ex.type === 'improv' || (ex.type === 'targets' && st.mic !== false) || (ex.type === 'melody' && st.answerMode === 'instrument');
   function renderSetup() {
     renderSetupBody();
+    if (draft && draft.focus && screen === 'setup') {
+      const h = $app.querySelector('.top');
+      if (h) h.insertAdjacentHTML('afterend', `<div class="focus-banner"><b>Séance ciblée sur tes points faibles</b><span>${esc(draft.focus)} — mélangés à quelques repères (tonique…). Tu peux encore ajuster avant de commencer.</span></div>`);
+    }
     if (!draft || screen !== 'setup' || !usesMic(draft.ex, draft.settings)) return micTestStop();
     const start = $app.querySelector('[data-act=start]');
     if (start) start.insertAdjacentHTML('beforebegin', micSensHtml());
@@ -1596,6 +1831,7 @@ const Piano = (() => {
     if (draft.ex.type === 'improv') return renderSetupImprov();
     if (draft.ex.type === 'loop') return renderSetupLoop();
     if (draft.ex.type === 'targets') return renderSetupTargets();
+    if (draft.ex.type === 'tonic') return renderSetupTonic();
     const { ex, settings: s } = draft;
     const editable = ex.custom || ex.saved;
     const presets = [['major', 'Majeur'], ['minor', 'Mineur nat.'], ['harmonic', 'Mineur harm.'], ['melodic', 'Mineur mél.'], ['all', 'Les 12'], ['none', 'Aucune']];
@@ -1658,7 +1894,7 @@ const Piano = (() => {
     else if (k === 'scale') draft.scale = v;
     else if (k === 'mode' && draft.ex.type === 'instrument') s.mode = v;
     else if (k === 'octaves' || k === 'questions' || k === 'seqLength' || k === 'hold' || k === 'seqLen' || k === 'bars' || k === 'bpc' || k === 'bpm' || k === 'keyPc' || k === 'rounds') s[k] = Number(v);
-    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones' || k === 'metro' || k === 'strict' || k === 'mic') s[k] = v === 'true';
+    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones' || k === 'metro' || k === 'strict' || k === 'mic' || k === 'check') s[k] = v === 'true';
     else if (k === 'count') s[k] = v === 'auto' ? 'auto' : Number(v);
     else s[k] = v;
     persistDraft(); renderSetup();
@@ -1709,6 +1945,7 @@ const Piano = (() => {
     if (draft.ex.type === 'improv') return startImprovSession();
     if (draft.ex.type === 'loop') return startLoopSession();
     if (draft.ex.type === 'targets') return startTargetSession();
+    if (draft.ex.type === 'tonic') return startTonicSession();
     const { ex, settings } = draft;
     if (ex.saved) { // garder les derniers réglages de l'exercice enregistré
       const list = savedList(); const i = list.findIndex((e) => e.id === ex.id);
@@ -1906,13 +2143,14 @@ const Piano = (() => {
         <div class="big-score">${S.firstTry}<small> / ${total}</small></div>
         ${S.skipped ? `<p class="muted">${S.skipped} question${S.skipped > 1 ? 's' : ''} passée${S.skipped > 1 ? 's' : ''}, non comptée${S.skipped > 1 ? 's' : ''} dans le score</p>` : ''}
         <p class="muted">${pct} % ${S.type === 'instrument' ? 'trouvées sans voir la note' : S.type === 'sing' ? 'chantées sans aide' : 'trouvées du premier coup'}</p>
-        ${S.type === 'instrument' && S.times.length ? `<p class="muted">Temps moyen pour trouver une note : <b>${(S.times.reduce((a, b) => a + b, 0) / S.times.length).toFixed(1).replace('.', ',')} s</b></p>` : ''}
+        ${(S.type === 'instrument' || S.type === 'tonic') && S.times.length ? `<p class="muted">Temps moyen pour trouver ${S.type === 'tonic' ? 'la tonique' : 'une note'} : <b>${(S.times.reduce((a, b) => a + b, 0) / S.times.length).toFixed(1).replace('.', ',')} s</b></p>` : ''}
       </div>
       <div class="panel">
-        <h2>${S.type === 'instrument' ? 'Notes révélées' : S.type === 'sing' ? 'Notes écoutées avant de chanter' : 'À retravailler'}</h2>
-        ${weak.length ? `<div class="weak">${weak.map(([n, c]) => `<span>${esc(S.type === 'chords' ? chordLabel(Number(n)) : S.type === 'instrument' || S.type === 'sing' ? n : M.label(Number(n), S.set.notation))} — ${c} fois</span>`).join('')}</div>`
+        <h2>${S.type === 'tonic' ? 'Tonalités manquées' : S.type === 'instrument' ? 'Notes révélées' : S.type === 'sing' ? 'Notes écoutées avant de chanter' : 'À retravailler'}</h2>
+        ${weak.length ? `<div class="weak">${weak.map(([n, c]) => `<span>${esc(S.type === 'chords' ? chordLabel(Number(n)) : S.type === 'instrument' || S.type === 'sing' || S.type === 'tonic' ? n : M.label(Number(n), S.set.notation))} — ${c} fois</span>`).join('')}</div>`
           : `<p class="muted">${S.type === 'instrument' ? 'Tu as tout trouvé sans aide.' : S.type === 'sing' ? 'Tout chanté sans écouter la note.' : 'Aucune erreur sur cette série.'}</p>`}
       </div>
+      ${levelUpHtml()}
       <div class="actions">
         <button class="btn secondary" data-act="home">Accueil</button>
         <button class="btn" data-act="again">Recommencer</button>
@@ -1947,7 +2185,8 @@ const Piano = (() => {
       </div>` : ''}
       <div class="panel">
         <div class="setting"><span class="lbl">Accords par question</span>
-          ${seg('seqLength', [[1, '1 accord'], [2, '2'], [3, '3'], [4, '4']], s.seqLength)}</div>
+          ${seg('seqLength', [[1, '1 accord'], [2, '2'], [3, '3'], [4, '4'], [6, '6'], [8, '8']], s.seqLength)}
+          ${s.seqLength >= 6 ? '<p class="hint">Grille longue : comme quand on relève un morceau. L\'écoute en boucle aide beaucoup.</p>' : ''}</div>
         ${s.seqLength > 1 ? `<div class="setting"><span class="lbl">Suites d'accords</span>
           ${seg('seqKind', [['random', 'Aléatoires'], ['common', 'Progressions courantes']], s.seqKind)}
           ${s.seqKind === 'common' && !commonOk ? '<p class="hint">Aucune progression courante avec ces accords : les suites seront aléatoires.</p>' : ''}</div>` : ''}
@@ -1957,12 +2196,19 @@ const Piano = (() => {
           ${seg('changeKey', [['exercise', 'Une pour toute la série'], ['question', 'À chaque question']], s.changeKey)}</div>` : ''}
         <div class="setting"><span class="lbl">Afficher la tonalité</span>
           ${seg('showKey', [['true', 'Oui'], ['false', 'Non']], s.showKey)}</div>
-        <div class="setting"><span class="lbl">Cadence</span>
-          ${seg('cadenceEach', [['true', 'Avant chaque question'], ['false', 'Seulement au changement de tonalité']], s.cadenceEach)}</div>
+        <div class="setting"><span class="lbl">Cadence au début</span>
+          ${seg('cadenceMode', [['each', 'Avant chaque question'], ['keychange', 'Au changement de tonalité'], ['none', 'Jamais']], chordCadenceMode(s))}
+          ${chordCadenceMode(s) === 'none' ? '<p class="hint">Sans cadence : sens d\'abord la tonalité, comme sur un vrai morceau. Écouter la cadence pendant une question compte comme une aide.</p>' : ''}</div>
+        <div class="setting"><span class="lbl">Écoute</span>
+          ${seg('listen', [['once', 'Une fois'], ['twice', 'Deux fois'], ['loop', 'En boucle']], s.listen)}
+          <p class="hint">${s.listen === 'loop' ? 'La suite tourne jusqu\'à ce que tu l\'aies entièrement trouvée : remplis les cases pendant qu\'elle joue.' : s.listen === 'twice' ? 'La suite passe deux fois.' : 'La suite passe une fois (tu peux la réécouter).'}</p></div>
         <div class="setting"><span class="lbl">Noms des réponses</span>
           ${seg('chordNotation', [['roman', 'Chiffres romains (I, ii, V…)'], ['degres', 'Degrés (1 à 7)']], s.chordNotation)}</div>
-        <div class="setting"><span class="lbl">Accords joués</span>
-          ${seg('voicing', [['block', 'En bloc (plaqués)'], ['arp', 'Note par note (arpégés)']], s.voicing)}</div>
+        <div class="setting"><span class="lbl">Accompagnement</span>
+          ${seg('voicing', [['block', 'En bloc (plaqués)'], ['arp', 'Note par note (arpégés)'], ['band', 'Groupe (batterie, basse)']], s.voicing)}
+          ${s.voicing === 'band' ? `${seg('groove', [['pop', 'Pop'], ['rock', 'Rock'], ['ballad', 'Ballade'], ['bossa', 'Bossa']], s.groove)}
+          <div class="row-gap">${seg('bpm', [[70, 'Lent'], [90, 'Moyen'], [115, 'Rapide']], s.bpm)}<input id="bpm" class="num" type="number" min="40" max="200" inputmode="numeric" value="${s.bpm}" aria-label="Tempo en battements par minute"><span class="muted">BPM</span></div>
+          <p class="hint">Une mesure par accord.</p>` : ''}</div>
         <div class="setting"><span class="lbl">Jeu du piano</span>
           ${seg('articulation', [['legato', 'Lié (legato)'], ['staccato', 'Détaché (staccato)']], s.articulation)}</div>
         <div class="setting"><label for="q-num">Nombre de questions</label>
@@ -2010,7 +2256,7 @@ const Piano = (() => {
       S.keyPc = M.pickKey(S.set.tonalite, S.keyPc); keyChanged = true;
     }
     S.t = M.tonicMidi(S.keyPc);
-    const seq = M.pickSequence(S.set.seqLength, S.degrees, S.set.seqKind, S.prevSeq);
+    const seq = S.set.seqLength > 4 ? longSequence(S.set.seqLength, S.degrees, S.set.seqKind, S.prevSeq) : M.pickSequence(S.set.seqLength, S.degrees, S.set.seqKind, S.prevSeq);
     S.prevSeq = seq; S.lastStatus = null;
     S.q = {
       seq, voiced: M.voiceProgression(S.t, seq.map((d) => S.triads[d])),
@@ -2018,7 +2264,57 @@ const Piano = (() => {
     };
     S.i++;
     renderPlayChords();
-    playQuestion(S.set.cadenceEach || keyChanged);
+    const cm = chordCadenceMode(S.set);
+    const withCad = cm === 'each' || (cm === 'keychange' && keyChanged);
+    if (S.set.voicing === 'band' || S.set.listen !== 'once') playChordGrid(withCad); else playQuestion(withCad);
+  }
+
+  const chordCadenceMode = (s) => s.cadenceMode || (s.cadenceEach === false ? 'keychange' : 'each');
+  const CHG = { pump: 0 };
+  function chordGridStop() { clearInterval(CHG.pump); CHG.pump = 0; TON.drums.forEach((n) => { try { n.stop(); } catch (e) {} }); TON.drums = []; }
+  /** Suite de 6 ou 8 accords « courante » : construite à partir des progressions de 4 (et 2) accords. */
+  function longSequence(len, degrees, kind, prev) {
+    const p4 = M.commonProgressions(4, degrees), p2 = M.commonProgressions(2, degrees);
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    if (kind === 'common' && p4.length) {
+      for (let k = 0; k < 10; k++) {
+        const a = pick(p4);
+        let seq;
+        if (len === 8) {
+          // deux progressions enchaînées, ou la même avec une fin variée
+          const others = degrees.filter((d) => d !== a[3] && d !== a[2]);
+          const b = Math.random() < 0.5 || !others.length ? pick(p4) : [...a.slice(0, 3), pick(others)];
+          seq = [...a, ...b];
+        } else seq = [...a, ...(p2.length ? pick(p2) : a.slice(0, 2))];
+        if (!prev || seq.join() !== prev.join()) return seq;
+      }
+    }
+    return M.pickSequence(len, degrees, 'random', prev);
+  }
+  /** Lecture de la suite selon les réglages : une fois / deux fois / en boucle ; plaquée, arpégée ou en groupe. */
+  function playChordGrid(withCadence) {
+    const tok = ++S.token, s = S.set, q = S.q;
+    chordGridStop(); Piano.stopAll();
+    setStatus('Écoute…');
+    let at = Piano.ctx.currentTime + 0.1;
+    if (withCadence) { const c = cadenceEvents(); c.ev.forEach((e) => e.midis.forEach((m) => Piano.note(m, at + e.at, e.dur, e.vel, releaseTime()))); at += c.end; }
+    const band = s.voicing === 'band', beat = 60 / (s.bpm || 90);
+    const passDur = band ? 4 * beat * q.voiced.length : chordEvents(q.voiced).end + 0.4;
+    const passes = s.listen === 'loop' ? Infinity : s.listen === 'twice' ? 2 : 1;
+    let done = 0, nextAt = at;
+    q.gridStart = at; q.passDur = passDur;
+    const pump = () => {
+      if (!S || tok !== S.token || q.solved) return chordGridStop();
+      while (done < passes && nextAt < Piano.ctx.currentTime + 0.8) {
+        const t = nextAt;
+        if (band) bandPass(q.voiced, t, beat, s.groove);
+        else chordEvents(q.voiced).ev.forEach((e) => e.midis.forEach((m) => Piano.note(m, t + e.at, e.dur, e.vel, releaseTime())));
+        done++; nextAt += passDur;
+      }
+      if (done >= passes && Piano.ctx.currentTime > nextAt - 0.3) { chordGridStop(); if (!q.solved) setStatus(chordPrompt()); }
+    };
+    pump(); CHG.pump = setInterval(pump, 120);
+    if (passes === Infinity) setTimeout(() => { if (S && tok === S.token && !q.solved) setStatus(chordPrompt()); }, 700);
   }
 
   /** Événements sonores pour une suite d'accords voicés (en bloc ou arpégés). */
@@ -2049,6 +2345,7 @@ const Piano = (() => {
   }
 
   function replayChords() {
+    if (S.set.voicing === 'band' || S.set.listen !== 'once') return playChordGrid(false);
     const tok = ++S.token; Piano.stopAll();
     Piano.sequence(chordEvents(S.q.voiced).ev, 0, releaseTime()).then(() => { if (S && tok === S.token && !S.q.solved) setStatus(chordPrompt()); });
   }
@@ -2079,6 +2376,7 @@ const Piano = (() => {
       return;
     }
     q.solved = true;
+    chordGridStop();
     const clean = !q.anyWrong && !q.helped;
     if (clean) S.firstTry++;
     renderPlayChords();
@@ -2093,7 +2391,7 @@ const Piano = (() => {
 
   function renderPlayChords() {
     const s = S.set, q = S.q;
-    const slots = q.seq.length > 1 ? `<div class="slots">${q.seq.map((d, k) =>
+    const slots = q.seq.length > 1 ? `<div class="slots${q.seq.length > 4 ? ' many' : ''}">${q.seq.map((d, k) =>
       `<span style="--c:var(--deg${d})" class="slot${k < q.pos ? ' done' : ''}${k === q.pos && !q.solved ? ' current' : ''}">${k < q.pos ? esc(chordLabel(d)) : '?'}</span>`).join('')}</div>` : '';
     $app.innerHTML = `
       <header class="top">
@@ -2103,7 +2401,7 @@ const Piano = (() => {
       </header>
       <div class="progress"><i style="width:${((S.i - 1) / S.n) * 100}%"></i></div>
       <div class="stage">
-        <span class="eyebrow">${esc(S.title)} · ${M.cadence(S.resScale).map((c) => c.name).join('–')}</span>
+        <span class="eyebrow">${esc(S.title)} · ${chordCadenceMode(s) === 'none' ? 'sans cadence' : M.cadence(S.resScale).map((c) => c.name).join('–')}</span>
         <span class="key">${s.showKey === false ? '?' : esc(M.keyName(S.keyPc, S.mode))}</span>
         ${slots}
         ${statusHtml()}
@@ -2996,7 +3294,12 @@ const Piano = (() => {
   };
   const LOOP = { timer: 0, raf: 0, wake: null };
   const loopList = (scaleKey) => Melody.LOOPS.filter((l) => !l.minor || M.SCALES[scaleKey].mode === 'minor');
-  const chordQual = (pcs) => { const th = M.mod(pcs[1] - pcs[0], 12), fi = M.mod(pcs[2] - pcs[0], 12); return fi === 6 ? '°' : fi === 8 ? '+' : th === 3 ? 'm' : ''; };
+  const chordQual = (pcs) => {
+    const th = M.mod(pcs[1] - pcs[0], 12), fi = M.mod(pcs[2] - pcs[0], 12);
+    if (pcs.length > 3) { const se = M.mod(pcs[3] - pcs[0], 12);
+      return fi === 6 ? (se === 9 ? '°7' : 'm7♭5') : th === 4 ? (fi === 8 ? '+maj7' : se === 11 ? 'maj7' : '7') : se === 11 ? 'm(maj7)' : 'm7'; }
+    return fi === 6 ? '°' : fi === 8 ? '+' : th === 3 ? 'm' : '';
+  };
 
   function renderSetupLoop() {
     const { ex, settings: s } = draft;
@@ -3062,6 +3365,23 @@ const Piano = (() => {
     S.t = M.tonicMidi(S.keyPc);
     S.chords = l.chords.map((d) => ({ d, ...M.triad(S.resScale, d) }));
     S.voiced = M.voiceProgression(S.t, S.chords);
+    if (S.type === 'targets' && needsSevenths(S.set)) {   // Notes cibles « septième » / « notes guides » : accords à 4 sons
+      S.chords = l.chords.map((d) => ({ d, ...seventhChord(S.resScale, d) }));
+      const bass = M.voiceProgression(S.t, S.chords.map((c) => ({ name: c.name, pcs: c.pcs.slice(0, 3) })));
+      const up = M.voiceProgression(S.t, S.chords.map((c) => ({ name: c.name, pcs: c.pcs.slice(1) })));
+      S.voiced = bass.map((b, k) => ({ name: b.name, bass: b.bass, upper: up[k].upper }));
+    }
+  }
+  const needsSevenths = (set) => set.target === 'seventh' || set.target === 'guide';
+  /** Accord à 4 sons sur le degré d : fondamentale, tierce, quinte, septième de la gamme ; chiffrage (Imaj7, V7, ii7, viiø7…). */
+  function seventhChord(scale, d) {
+    const tri = M.triad(scale, d), pcs = [...tri.pcs, scale[(d + 6) % 7]];
+    const th = M.mod(pcs[1] - pcs[0], 12), fi = M.mod(pcs[2] - pcs[0], 12), se = M.mod(pcs[3] - pcs[0], 12);
+    let name = tri.name;
+    if (fi === 6) name = name.replace('°', se === 9 ? '°7' : 'ø7');
+    else if (th === 4) name += se === 11 ? 'maj7' : '7';
+    else name += se === 11 ? '(maj7)' : '7';
+    return { name, pcs };
   }
 
   function loopStop() {
@@ -3169,17 +3489,17 @@ const Piano = (() => {
     style: 'hold', metro: true, rounds: 2, target: 'third', help: true, strict: false, mic: true,
   };
   const TGT = { pump: 0, det: 0, wake: null };
-  const TYPE_LBL = ['fondamentale', 'tierce', 'quinte'];
-  const TYPE_SHORT = ['F', 'T', 'Q'];
+  const TYPE_LBL = ['fondamentale', 'tierce', 'quinte', 'septième'];
+  const TYPE_SHORT = ['F', 'T', 'Q', '7'];
   const HIT_MS = 300; // note stable pendant 0,3 s pour être validée
 
   function renderSetupTargets() {
     const { ex, settings: s } = draft;
     const sc = M.SCALES[s.scale].notes;
-    const romans = (l) => l.chords.map((d) => M.triad(sc, d).name).join(' – ');
+    const romans = (l) => l.chords.map((d) => (needsSevenths(s) ? seventhChord(sc, d) : M.triad(sc, d)).name).join(' – ');
     const list = loopList(s.scale);
     if (s.loop !== 'surprise' && !list.some((l) => l.name === s.loop)) s.loop = 'surprise';
-    const tHint = { root: 'Toujours la fondamentale de l\'accord (ex. ii → 2).', third: 'Toujours la tierce de l\'accord (ex. ii → 4) : la note qui donne sa couleur à l\'accord.', fifth: 'Toujours la quinte de l\'accord (ex. ii → 6).', mixed: 'L\'app choisit au hasard pour chaque accord : fondamentale, tierce ou quinte.', path: 'L\'app choisit la note de l\'accord la plus proche de la cible précédente : on enchaîne les accords sans sauter, comme le font les improvisateurs.' }[s.target];
+    const tHint = { root: 'Toujours la fondamentale de l\'accord (ex. ii → 2).', third: 'Toujours la tierce de l\'accord (ex. ii → 4) : la note qui donne sa couleur à l\'accord.', fifth: 'Toujours la quinte de l\'accord (ex. ii → 6).', mixed: 'L\'app choisit au hasard pour chaque accord : fondamentale, tierce ou quinte.', seventh: 'Toujours la septième de l\'accord (ex. ii7 → 1, V7 → 4). Les accords deviennent des accords à 4 sons (maj7, 7, m7).', guide: 'La tierce ou la septième, la plus proche de la note précédente : une ligne qui bouge à peine et fait entendre toute la grille (ex. sur ii7 – V7 – Imaj7 : 1 – 7 – 7). Accords à 4 sons.', path: 'L\'app choisit la note de l\'accord la plus proche de la cible précédente : on enchaîne les accords sans sauter, comme le font les improvisateurs.' }[s.target];
     $app.innerHTML = `
       <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
       <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
@@ -3189,7 +3509,7 @@ const Piano = (() => {
           ${seg('mic', [['true', 'Oui'], ['false', 'Non']], s.mic)}
           <p class="hint">${s.mic ? 'L\'app écoute ce que tu joues et compte les cibles touchées. <b>Écouteurs nécessaires</b> : sans eux, le micro entendrait le piano. Sans écouteurs, choisis « Non ».' : 'Entraînement libre : les accords et la note à viser, sans écoute ni score. La boucle tourne jusqu\'à ce que tu arrêtes ; pas besoin d\'écouteurs.'}</p></div>
         <div class="setting"><span class="lbl">Cible</span>
-          ${seg('target', [['root', 'Fondamentale'], ['third', 'Tierce'], ['fifth', 'Quinte'], ['mixed', 'Mélangé'], ['path', 'Chemin le plus court']], s.target)}
+          ${seg('target', [['root', 'Fondamentale'], ['third', 'Tierce'], ['fifth', 'Quinte'], ['mixed', 'Mélangé'], ['path', 'Chemin le plus court'], ['seventh', 'Septième'], ['guide', 'Notes guides']], s.target)}
           <p class="hint">${tHint}</p></div>
         <div class="setting"><span class="lbl">Aide</span>
           ${seg('help', [['true', 'Avec la note'], ['false', 'Sans la note']], s.help)}
@@ -3253,13 +3573,19 @@ const Piano = (() => {
     if (S.targets[slot]) return S.targets[slot];
     const ch = S.chords[slot % S.chords.length], t = S.set.target;
     let idx;
-    if (t === 'root') idx = 0; else if (t === 'third') idx = 1; else if (t === 'fifth') idx = 2;
+    const dist = (a, b) => { const d = M.mod(a - b, 12); return Math.min(d, 12 - d); };
+    if (t === 'root') idx = 0; else if (t === 'third') idx = 1; else if (t === 'fifth') idx = 2; else if (t === 'seventh') idx = 3;
     else if (t === 'mixed') idx = Math.floor(Math.random() * 3);
+    else if (t === 'guide') {
+      // notes guides : tierce ou septième, la plus proche de la cible précédente (à égalité, on alterne)
+      const prev = slot > 0 ? targetFor(slot - 1) : null;
+      if (!prev) idx = 1;
+      else { const d1 = dist(ch.pcs[1], prev.pc), d3 = dist(ch.pcs[3], prev.pc); idx = d1 < d3 ? 1 : d3 < d1 ? 3 : (prev.idx === 1 ? 3 : 1); }
+    }
     else {
       const prev = slot > 0 ? targetFor(slot - 1) : null;
       if (!prev) idx = 1;
       else {
-        const dist = (a, b) => { const d = M.mod(a - b, 12); return Math.min(d, 12 - d); };
         const pref = [1, 0, 2]; // à distance égale : tierce, puis fondamentale, puis quinte
         idx = pref.reduce((best, i) => (dist(ch.pcs[i], prev.pc) < dist(ch.pcs[best], prev.pc) ? i : best), pref[0]);
       }
@@ -3360,7 +3686,7 @@ const Piano = (() => {
       return rows.join('');
     };
     if (S.finished) {
-      const by = [0, 1, 2].map((i) => { const ks = S.results.map((r, k) => [r, k]).filter(([, k]) => targetFor(k).idx === i); return { i, n: ks.length, ok: ks.filter(([r]) => r).length }; }).filter((x) => x.n);
+      const by = [0, 1, 2, 3].map((i) => { const ks = S.results.map((r, k) => [r, k]).filter(([, k]) => targetFor(k).idx === i); return { i, n: ks.length, ok: ks.filter(([r]) => r).length }; }).filter((x) => x.n);
       const shown = Math.max(0, S.done - 8 * L);
       $app.innerHTML = head + `
         <div class="panel" style="text-align:center;align-items:center">
@@ -3371,6 +3697,7 @@ const Piano = (() => {
         </div>
         <section class="ana"><span class="eyebrow">${esc(S.loop.name)}</span>${S.done ? tourGrid(shown - (shown % L), S.done) : '<p class="muted">Aucun accord joué.</p>'}
           <span class="hint">F : fondamentale · T : tierce · Q : quinte. Vert : touchée · rouge : manquée.</span></section>
+        ${levelUpHtml()}
         <div class="tg-end">
           <button class="btn" data-act="tgt-again">Recommencer · même boucle</button>
           <div class="actions"><button class="btn secondary" data-act="tgt-other">Autre boucle</button><button class="btn secondary" data-act="home">Quitter</button></div>
@@ -3404,6 +3731,252 @@ const Piano = (() => {
       ${S.running ? `<div class="tg-grid">${tourGrid((tour - 1) * L, Math.min(tour * L, S.total))}</div>` : ''}
       ${S.running ? `<button class="btn secondary wide" data-act="tgt-stop">${S.total === Infinity && s.mic ? 'Arrêter et voir le bilan' : 'Arrêter'}</button>`
         : `<div class="actions"><button class="btn secondary" data-act="tgt-rand">Au hasard</button><button class="btn" data-act="tgt-go">C'est parti</button></div>`}`;
+  }
+
+  /* ---------- Trouver la tonique (sans cadence) ---------- */
+  const TONIC_DEFAULTS = {
+    context: 'chords', listen: 'loop', check: false, answer: 'buttons', headphones: false,
+    level: 'easy', modeSel: 'major', bpm: 90, groove: 'pop', questions: 10,
+  };
+  const TON = { pump: 0, det: 0, drums: [] };
+  const PC_NAMES = ['Do', 'Do♯', 'Ré', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'];
+
+  function renderSetupTonic() {
+    const { ex, settings: s } = draft;
+    const micNoHp = s.answer === 'instrument' && !s.headphones;
+    if (micNoHp && s.listen === 'loop') s.listen = 'twice';
+    $app.innerHTML = `
+      <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
+      <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
+      <p class="hint">Pas de cadence : comme quand tu découvres un morceau avec d'autres, retrouve la tonique à l'oreille. La cadence arrive après ta réponse, pour confirmer.</p>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Ce que tu entends</span>
+          ${seg('context', [['melody', 'Une mélodie'], ['chords', 'Des accords'], ['band', 'Un groupe']], s.context)}
+          <p class="hint">${{ melody: 'Une courte phrase jouée seule, sans accords.', chords: 'Une boucle d\'accords au piano.', band: 'Batterie, basse et accords : le contexte le plus proche d\'un vrai morceau.' }[s.context]}</p></div>
+        ${s.context === 'band' ? `<div class="setting"><span class="lbl">Style</span>${seg('groove', [['pop', 'Pop'], ['rock', 'Rock'], ['ballad', 'Ballade'], ['bossa', 'Bossa']], s.groove)}</div>` : ''}
+        <div class="setting"><span class="lbl">Écoute</span>
+          ${seg('listen', [['loop', 'En boucle'], ['twice', 'Deux fois'], ['once', 'Une fois']], s.listen)}
+          <p class="hint">${micNoHp ? 'Sans écouteurs, réponds à l\'instrument quand la musique s\'est arrêtée (le micro entendrait le piano) : « En boucle » n\'est pas possible.' : { loop: 'La musique tourne jusqu\'à ta réponse : tu as tout ton temps.', twice: 'La musique passe deux fois puis s\'arrête.', once: 'Une seule écoute : il faut être sûr tout de suite.' }[s.listen]} ${s.listen !== 'loop' ? '« Réécouter » reste possible, mais la réponse ne compte plus du premier coup.' : ''}</p></div>
+        <div class="setting"><span class="lbl">Difficulté</span>
+          ${seg('level', [['easy', 'Facile'], ['medium', 'Moyen'], ['hard', 'Difficile']], s.level)}
+          <p class="hint">${s.context === 'melody' ? { easy: 'La phrase finit sur la tonique.', medium: 'La phrase s\'arrête juste avant la tonique.', hard: 'La phrase s\'arrête une mesure avant la fin : pas de conclusion.' }[s.level]
+            : { easy: 'La boucle commence sur I et contient V : la tonique s\'impose vite.', medium: 'La boucle commence sur I, sans forcément passer par V.', hard: 'La boucle commence sur un autre accord (ex. vi, IV) : en majeur, on peut l\'entendre dans le mineur relatif.' }[s.level]}</p></div>
+        <div class="setting"><span class="lbl">Mode</span>${seg('modeSel', [['major', 'Majeur'], ['minor', 'Mineur'], ['both', 'Les deux']], s.modeSel)}</div>
+      </div>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Répondre</span>
+          ${seg('answer', [['buttons', 'Avec les boutons'], ['instrument', 'Avec mon instrument']], s.answer)}</div>
+        ${s.answer === 'instrument' ? `<div class="setting"><span class="lbl">J'ai des écouteurs</span>${seg('headphones', [['false', 'Non'], ['true', 'Oui']], s.headphones)}</div>` : ''}
+        <div class="setting"><span class="lbl">Vérifier avant de valider</span>
+          ${seg('check', [['false', 'Non'], ['true', 'Oui (aide)']], s.check)}
+          <p class="hint">${s.check ? 'Tu peux tester des notes par-dessus la musique, puis tu valides avec « C\'est la tonique ».' : s.answer === 'instrument' ? 'La première note que tu tiens (0,5 s) est ta réponse.' : 'La première touche que tu touches est ta réponse.'}</p></div>
+        <div class="setting"><label for="bpm">Tempo</label>
+          <div class="row-gap">${seg('bpm', [[70, 'Lent'], [90, 'Moyen'], [115, 'Rapide']], s.bpm)}
+          <input id="bpm" class="num" type="number" min="40" max="200" inputmode="numeric" value="${s.bpm}" aria-label="Tempo en battements par minute"><span class="muted">BPM</span></div></div>
+        <div class="setting"><label for="q-num">Nombre de questions</label>
+          <div class="row-gap">${seg('questions', [5, 10, 20].map((n) => [n, n]), s.questions)}
+          <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
+      </div>
+      <button class="btn wide" data-act="start">Commencer</button>`;
+  }
+
+  async function startTonicSession() {
+    const s = { ...draft.settings };
+    if (s.answer === 'instrument' && !s.headphones && s.listen === 'loop') s.listen = 'twice';
+    S = {
+      type: 'tonic', title: 'Trouver la tonique', set: s, n: Math.max(1, Math.min(200, s.questions || 10)), i: 0,
+      firstTry: 0, missed: {}, skipped: 0, times: [], token: 0, keyPc: null, mode: 'major', resScale: M.SCALES.major.notes,
+    };
+    screen = 'play'; pushScreen();
+    $app.innerHTML = `<div class="loading">Chargement du piano${s.answer === 'instrument' ? ' et du micro' : ''}…</div>`;
+    await Piano.unlock();
+    if (!S) return;
+    if (s.answer === 'instrument') { try { await micStart(); } catch (e) { return micError(e); } }
+    nextTonicQuestion(true);
+  }
+
+  /** Une question : tonalité, mode et musique (boucle d'accords ou mélodie), sans cadence. */
+  function nextTonicQuestion(first) {
+    const s = S.set;
+    tonicStop();
+    const mode = s.modeSel === 'both' ? (Math.random() < 0.5 ? 'major' : 'minor') : s.modeSel;
+    const scaleKey = mode === 'minor' ? 'minor' : 'major';
+    S.keyPc = M.pickKey('random', S.keyPc); S.mode = mode; S.resScale = M.SCALES[scaleKey].notes; S.t = M.tonicMidi(S.keyPc);
+    const q = { phase: 'ready', helped: false, answered: false, picked: null, heard: null, hold: 0, lastMatch: 0, holdPc: null, mel: null, chords: null };
+    if (s.context === 'melody') {
+      const mel = Melody.generate({ level: 'medium', scale: S.resScale });
+      let notes = mel.notes;
+      if (s.level === 'medium') notes = notes.slice(0, -1);
+      if (s.level === 'hard') { const lastBar = Math.floor(notes[notes.length - 1].beat / 4); notes = notes.filter((n) => Math.floor(n.beat / 4) < lastBar); if (notes.length < 3) notes = mel.notes.slice(0, -1); }
+      q.mel = notes.map((n) => ({ midi: S.t + n.semi, beat: n.beat, dur: n.dur }));
+      q.passBeats = Math.ceil((notes[notes.length - 1].beat + notes[notes.length - 1].dur) / 4) * 4 + 2;
+    } else {
+      const list = loopList(scaleKey);
+      let pool = s.level === 'easy' ? list.filter((l) => l.chords[0] === 0 && l.chords.includes(4) && l.chords.length >= 3)
+        : s.level === 'hard' ? list.filter((l) => l.chords.length >= 3) : list.filter((l) => l.chords[0] === 0);
+      if (!pool.length) pool = list;
+      const l = pool[Math.floor(Math.random() * pool.length)];
+      let ch = [...l.chords];
+      if (s.level === 'hard') {
+        const starts = ch.map((d, i) => i).filter((i) => ch[i] !== 0);
+        if (!starts.length) ch = [5, 3, 0, 4];
+        else { const r = starts[Math.floor(Math.random() * starts.length)]; ch = ch.slice(r).concat(ch.slice(0, r)); }
+      }
+      if (ch.length === 2) ch = ch.concat(ch);
+      q.chords = ch.map((d) => ({ d, ...M.triad(S.resScale, d) }));
+      q.voiced = M.voiceProgression(S.t, q.chords);
+      q.loopName = l.name;
+      q.passBeats = 4 * q.chords.length;
+    }
+    S.i++; S.q = q;
+    renderPlayTonic();
+    if (!first) playTonic();
+  }
+
+  function tonicStop() {
+    clearInterval(TON.pump); TON.pump = 0; clearInterval(TON.det); TON.det = 0;
+    TON.drums.forEach((n) => { try { n.stop(); } catch (e) {} }); TON.drums = [];
+    Piano.stopAll();
+  }
+
+  /* Batterie fabriquée par l'app (sons simples, un peu électroniques). */
+  function drumHit(kind, at, vel = 1) {
+    const ctx = Piano.ctx, g = ctx.createGain();
+    g.connect(Piano.out);
+    if (kind === 'kick') {
+      const o = ctx.createOscillator(); o.frequency.setValueAtTime(140, at); o.frequency.exponentialRampToValueAtTime(42, at + 0.12);
+      g.gain.setValueAtTime(0.9 * vel, at); g.gain.exponentialRampToValueAtTime(0.001, at + 0.3);
+      o.connect(g); o.start(at); o.stop(at + 0.32); TON.drums.push(o);
+      return;
+    }
+    if (!TON.noise) { const b = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; TON.noise = b; }
+    const src = ctx.createBufferSource(); src.buffer = TON.noise;
+    const f = ctx.createBiquadFilter();
+    if (kind === 'snare') { f.type = 'highpass'; f.frequency.value = 1200; g.gain.setValueAtTime(0.45 * vel, at); g.gain.exponentialRampToValueAtTime(0.001, at + 0.16);
+      const o = ctx.createOscillator(), og = ctx.createGain(); o.frequency.value = 190; og.gain.setValueAtTime(0.35 * vel, at); og.gain.exponentialRampToValueAtTime(0.001, at + 0.08); o.connect(og); og.connect(Piano.out); o.start(at); o.stop(at + 0.1); TON.drums.push(o); }
+    else if (kind === 'rim') { f.type = 'bandpass'; f.frequency.value = 2500; g.gain.setValueAtTime(0.35 * vel, at); g.gain.exponentialRampToValueAtTime(0.001, at + 0.05); }
+    else { f.type = 'highpass'; f.frequency.value = 7000; g.gain.setValueAtTime(0.16 * vel, at); g.gain.exponentialRampToValueAtTime(0.001, at + (kind === 'open' ? 0.2 : 0.045)); }
+    src.connect(f); f.connect(g); src.start(at, Math.random() * 0.5); src.stop(at + 0.25); TON.drums.push(src);
+  }
+  // 8 croches par mesure : batterie, basse (R = fondamentale, F = quinte) et accords
+  const GROOVES = {
+    pop: { kick: [0, 3, 4], snare: [2, 6], hat: [0, 1, 2, 3, 4, 5, 6, 7], bass: { 0: 'R', 3: 'R', 4: 'R', 6: 'F' }, comp: { 0: 3, 4: 3 } },
+    rock: { kick: [0, 4, 5], snare: [2, 6], hat: [0, 1, 2, 3, 4, 5, 6, 7], bass: { 0: 'R', 1: 'R', 2: 'R', 3: 'R', 4: 'R', 5: 'R', 6: 'R', 7: 'R' }, comp: { 0: 1, 2: 1, 4: 1, 6: 1 } },
+    ballad: { kick: [0, 5], snare: [4], hat: [0, 2, 4, 6], bass: { 0: 'R', 4: 'F', 7: 'R' }, comp: { 0: 7 } },
+    bossa: { kick: [0, 3, 4, 7], rim: [0, 3, 6], hat: [0, 1, 2, 3, 4, 5, 6, 7], bass: { 0: 'R', 3: 'F', 4: 'F', 7: 'R' }, comp: { 1: 1, 3: 1, 4: 2, 6: 1 } },
+  };
+
+  /** Programme un passage de la musique à l'instant `at`. */
+  function scheduleTonicPass(at, beat) {
+    const s = S.set, q = S.q, rel = releaseTime();
+    if (q.mel) { q.mel.forEach((n) => Piano.note(n.midi, at + n.beat * beat, n.dur * beat * 0.95, 0.85, rel)); return; }
+    if (s.context === 'chords') { q.voiced.forEach((v, k) => { const t0 = at + 4 * k * beat; Piano.note(v.bass, t0, 4 * beat * 0.97, 0.42, rel); v.upper.forEach((m) => Piano.note(m, t0, 4 * beat * 0.97, 0.3, rel)); }); return; }
+    bandPass(q.voiced, at, beat, s.groove);
+  }
+  /** Un passage « groupe » : batterie, basse et accords, une mesure par accord. */
+  function bandPass(voiced, at, beat, groove) {
+    voiced.forEach((v, k) => {
+      const t0 = at + 4 * k * beat;
+      const G = GROOVES[groove] || GROOVES.pop, e = beat / 2;
+      G.kick.forEach((i) => drumHit('kick', t0 + i * e));
+      (G.snare || []).forEach((i) => drumHit('snare', t0 + i * e));
+      (G.rim || []).forEach((i) => drumHit('rim', t0 + i * e));
+      G.hat.forEach((i) => drumHit('hat', t0 + i * e, i % 2 ? 0.6 : 1));
+      Object.entries(G.bass).forEach(([i, n]) => Piano.note(v.bass - 12 + (n === 'F' ? 7 : 0), t0 + i * e, e * 1.8, 0.55, 0.08));
+      Object.entries(G.comp).forEach(([i, len]) => v.upper.forEach((m) => Piano.note(m, t0 + i * e, e * len * 0.9, 0.24, 0.08)));
+    });
+  }
+
+  function playTonic(replay = false) {
+    const s = S.set, q = S.q;
+    tonicStop();
+    if (replay && !q.answered) q.helped = true;
+    const ctx = Piano.ctx, beat = 60 / s.bpm, passDur = q.passBeats * beat;
+    const passes = q.answered ? 1 : s.listen === 'loop' ? Infinity : s.listen === 'twice' ? 2 : 1;
+    let at = ctx.currentTime + 0.15;
+    if (q.answered) {   // confirmation : la cadence, puis la musique une fois
+      M.voiceProgression(S.t, M.cadence(S.resScale)).forEach((c, k) => {
+        const t = at + 2 * k * beat; Piano.note(c.bass, t, 2 * beat * 0.95, 0.5, releaseTime()); c.upper.forEach((m) => Piano.note(m, t, 2 * beat * 0.95, 0.36, releaseTime()));
+      });
+      at += 8 * beat + beat;
+    }
+    Object.assign(q, { beat, passDur, passes, startAt: at, done: 0, nextAt: at, endAt: passes === Infinity ? Infinity : at + passes * passDur });
+    if (!q.answered && q.t0 == null) q.t0 = performance.now();
+    q.stoppedShown = false;
+    q.phase = q.answered ? 'answered' : 'playing';
+    const pump = () => { while (S && S.q === q && q.done < q.passes && q.nextAt < Piano.ctx.currentTime + 0.8) { scheduleTonicPass(q.nextAt, beat); q.done++; q.nextAt += passDur; } };
+    pump(); TON.pump = setInterval(pump, 120);
+    TON.det = setInterval(tonicTick, 40);
+    renderPlayTonic();
+  }
+
+  function tonicTick() {
+    const q = S && S.q; if (!q || S.type !== 'tonic') return;
+    const now = Piano.ctx.currentTime;
+    const playing = now < q.endAt;
+    if (!playing && q.phase === 'playing' && !q.stoppedShown) { q.stoppedShown = true; renderPlayTonic(); }
+    if (q.answered || S.set.answer !== 'instrument' || !Mic.analyser) return;
+    if (playing && !S.set.headphones) return;   // sans écouteurs : le micro attend la fin de la musique
+    const r = micDetect();
+    const lvl = document.getElementById('lvl'); if (lvl) lvl.style.width = Math.min(100, Math.round((r ? r.rms : 0) * 400)) + '%';
+    const t = performance.now();
+    let pc = null;
+    if (clarOk(r, 0.8)) { const m = Pitch.toMidi(r.freq), n = Math.round(m); if (Math.abs(m - n) <= 0.4) pc = M.mod(n, 12); }
+    if (pc !== null && pc === q.holdPc) { q.hold += q.lastMatch ? Math.min(t - q.lastMatch, 120) : 40; q.lastMatch = t; }
+    else if (pc !== null) { q.holdPc = pc; q.hold = 0; q.lastMatch = t; }
+    else if (q.lastMatch && t - q.lastMatch > 180) { q.hold = 0; q.lastMatch = 0; q.holdPc = null; }
+    if (q.holdPc !== null && q.hold >= 500) {
+      const heard = q.holdPc; q.hold = -1e9;   // une seule fois par note tenue
+      if (S.set.check) { q.heard = heard; renderPlayTonic(); }
+      else answerTonic(heard);
+    }
+  }
+
+  function answerTonic(pc) {
+    const q = S.q; if (q.answered) return;
+    q.answered = true; q.picked = pc; q.secs = (performance.now() - (q.t0 || performance.now())) / 1000;
+    q.correct = pc === S.keyPc;
+    q.relative = !q.correct && pc === M.mod(S.keyPc + (S.mode === 'minor' ? 3 : 9), 12);
+    if (q.correct && !q.helped) { S.firstTry++; S.times.push(q.secs); }
+    if (!q.correct) { const k = M.keyName(S.keyPc, S.mode); S.missed[k] = (S.missed[k] || 0) + 1; }
+    playTonic();   // cadence de confirmation, puis la musique
+  }
+
+  function renderPlayTonic() {
+    const s = S.set, q = S.q;
+    const playing = q.phase === 'playing' && Piano.ctx.currentTime < q.endAt;
+    const kbd = (sel) => { const whites = [0, 2, 4, 5, 7, 9, 11], blacks = { 1: 0, 3: 1, 6: 3, 8: 4, 10: 5 };
+      return `<div class="tk">${whites.map((pc) => `<button class="tk-w${sel(pc)}" data-act="tonic-key" data-v="${pc}">${PC_NAMES[pc]}</button>`).join('')}${Object.entries(blacks).map(([pc, w]) => `<button class="tk-b${sel(Number(pc))}" data-act="tonic-key" data-v="${pc}" style="left:calc(${(w + 1) * (100 / 7)}% - 5.5%)">${PC_NAMES[pc]}</button>`).join('')}</div>`; };
+    const head = `
+      <header class="top">
+        <button class="link-btn" data-act="home">‹ Quitter</button>
+        <span class="eyebrow">Question ${S.i} / ${S.n}</span>
+        <span class="score">${S.firstTry} ✓</span>
+      </header>
+      <div class="progress"><i style="width:${((S.i - 1) / S.n) * 100}%"></i></div>`;
+    if (q.answered) {
+      const degs = q.chords ? q.chords.map((c) => `<span class="prog-chord" style="--c:var(--deg${c.d})">${esc(c.name)}</span>`).join('') : '';
+      $app.innerHTML = head + `
+        <div class="stage"><span class="eyebrow">C'était</span><span class="key">${esc(M.keyName(S.keyPc, S.mode))}</span>
+          <p class="status ${q.correct ? 'good' : 'bad'}">${q.correct ? `✓ Tonique trouvée${q.helped ? ' (avec réécoute)' : ''} en ${q.secs.toFixed(1).replace('.', ',')} s` : q.relative ? `✗ Tu as choisi ${PC_NAMES[q.picked]} : la tonique du relatif ${S.mode === 'minor' ? 'majeur' : 'mineur'}. Même notes, autre centre.` : `✗ Tu as choisi ${PC_NAMES[q.picked]}.`}</p></div>
+        ${degs ? `<div class="dlg"><span class="dlg-who">Les accords</span><div class="prog-bars loop-grid"><span class="prog-bar">${degs}</span></div></div>` : ''}
+        <p class="hint" style="text-align:center">La cadence confirme la tonalité, puis la musique repasse une fois.</p>
+        <div class="controls"><button class="ctl" data-act="tonic-replay">${ICON.cadence}Réécouter avec la cadence</button></div>
+        <div class="actions"><button class="btn secondary" data-act="home">Quitter</button><button class="btn" data-act="tonic-next">${S.i >= S.n ? 'Voir le bilan' : 'Question suivante'}</button></div>`;
+      return;
+    }
+    const micWait = s.answer === 'instrument' && !s.headphones && playing;
+    $app.innerHTML = head + `
+      <div class="stage"><span class="eyebrow">Trouver la tonique · ${{ melody: 'mélodie', chords: 'accords', band: 'groupe' }[s.context]}</span>
+        <span class="key">?</span>
+        <p class="status">${q.phase === 'ready' ? 'Écoute, puis trouve la tonique.' : playing ? (micWait ? 'Écoute… tu joueras quand la musique s\'arrête.' : 'Écoute… trouve la tonique.') : 'À toi : quelle est la tonique ?'}</p></div>
+      ${s.answer === 'buttons' ? kbd((pc) => (q.picked === pc ? ' sel' : ''))
+        : `<div class="mic-panel"><span class="mic-icon">${ICON.mic}</span><span>${s.check ? (q.heard !== null ? '✓ Note entendue : valide si c\'est ta réponse, ou joue-en une autre.' : 'Cherche la tonique sur ton instrument, tiens la note.') : 'Joue la tonique et tiens-la un instant : la première note tenue est ta réponse.'}</span><div class="level"><i id="lvl"></i></div></div>`}
+      <div class="actions">
+        ${q.phase === 'ready' ? '<button class="btn wide" data-act="tonic-play" style="grid-column:1/-1">Écouter</button>'
+          : `${s.listen !== 'loop' ? `<button class="btn secondary" data-act="tonic-again" ${playing ? 'disabled' : ''}>Réécouter</button>` : ''}
+             ${s.check ? `<button class="btn" data-act="tonic-ok" ${(s.answer === 'buttons' ? q.picked : q.heard) === null ? 'disabled' : ''} ${s.listen === 'loop' ? 'style="grid-column:1/-1"' : ''}>C'est la tonique</button>` : ''}`}
+      </div>`;
   }
 
   function renderSetupImprov() {
@@ -3892,10 +4465,25 @@ const Piano = (() => {
     switch (b.dataset.act) {
       case 'home': try { history.back(); } catch (err) {} goHome(); break;
       case 'open': openSetup(b.dataset.id); break;
+      case 'focus': openFocus(b.dataset.id); break;
+      case 'lvl-yes': applyLevelUp(); break;
+      case 'lvl-no': { const el = b.closest('.level-up'); if (el) el.remove(); break; }
+      case 'goal': Store.set('goalMin', Number(v)); renderHome(); break;
       case 'mic-sens': Store.set('micSens', v); renderSetup(); break;
       case 'mic-test': micTestStart(); break;
       case 'loop-go': S.played = true; startLoop(); break;
       case 'tgt-go': startTargets(); break;
+      case 'tonic-play': playTonic(); break;
+      case 'tonic-again': playTonic(true); break;
+      case 'tonic-replay': playTonic(); break;
+      case 'tonic-key': {
+        const pc = Number(v), q = S.q; if (!q || q.answered || q.phase === 'ready') break;
+        Piano.note(60 + pc, Piano.ctx.currentTime + 0.02, 0.9, 0.8, releaseTime());   // la note sonne par-dessus la musique ; le clavier va de Do4 à Si4, comme un vrai piano
+        if (S.set.check) { q.picked = pc; renderPlayTonic(); } else answerTonic(pc);
+        break;
+      }
+      case 'tonic-ok': if (S.q && !S.q.answered) answerTonic(S.set.answer === 'buttons' ? S.q.picked : S.q.heard); break;
+      case 'tonic-next': tonicStop(); if (S.i >= S.n) finish(); else nextTonicQuestion(false); break;
       case 'tgt-stop': if (S.total === Infinity && S.set.mic) { closeSlot(S.abs); finishTargets(); } else { targetStop(); Piano.stopAll(); S.abs = -1; S.done = 0; S.hits = 0; renderPlayTargets(); } break;
       case 'tgt-again': S.finished = false; startTargets(); break;   // même boucle, même tonalité : on relance tout de suite
       case 'tgt-other': S.finished = false; S.abs = -1; S.done = 0; S.hits = 0; S.targets = []; S.results = []; pickLoop(); renderPlayTargets(); break;   // boucle au hasard, puis écran de départ (flèches pour choisir)
@@ -3974,7 +4562,7 @@ const Piano = (() => {
         persistDraft(); renderSetup(); break;
       }
       case 'all-degrees': draft.degrees = [...ALL7]; persistDraft(); renderSetup(); break;
-      case 'replay-cadence': if (S.type === 'instrument') playInstrumentQuestion(true); else playQuestion(true, true); break;
+      case 'replay-cadence': if (S.type === 'instrument') playInstrumentQuestion(true); else { if (S.type === 'chords') { chordGridStop(); if (chordCadenceMode(S.set) === 'none' && S.q && !S.q.solved) S.q.helped = true; } playQuestion(true, true); } break;
       case 'replay-note': replayNote(); break;
       case 'kbd':
         S.kbdOpen = !S.kbdOpen;
