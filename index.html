@@ -417,6 +417,43 @@ p { margin: 0; }
 .loop-nav .ctl { font-size: 1.6rem; font-weight: 800; padding: 8px 0; line-height: 1; }
 .loop-nav b { display: block; font-size: 1rem; }
 
+/* Question-réponse : accord en cours, réponse sur la grille, balance */
+.imp-chord { display: flex; align-items: baseline; gap: 10px; padding: 6px 14px; border-radius: 12px; background: color-mix(in srgb, var(--c) 16%, var(--surface)); box-shadow: inset 0 -4px 0 var(--c); }
+.imp-chord b { font-family: var(--font-display); font-size: 1.8rem; line-height: 1.1; }
+.imp-tones { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.grid-ans { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 6px; }
+.ga-col { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px; border-radius: 10px; background: var(--bg); }
+.ga-tones { font-size: .72rem; font-weight: 700; color: var(--muted); }
+.ga-notes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+.ga-note { position: relative; min-width: 30px; text-align: center; padding: 3px 6px; border-radius: 7px; border: 2px dashed var(--line); font-weight: 750; font-size: .85rem; }
+.ga-note.ct { border: 2px solid var(--c); background: color-mix(in srgb, var(--c) 18%, var(--surface)); }
+.ga-note.strong::after { content: "▲"; position: absolute; top: -7px; right: -3px; font-size: .5rem; color: var(--ink); }
+.balance { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; font-size: .85rem; font-weight: 700; color: var(--muted); padding: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.balance input { width: 100%; accent-color: var(--accent); }
+.imp-chord[hidden] { display: none; }
+
+/* ---------- Notes cibles ---------- */
+.tg-aim { margin-top: 6px; font-family: var(--font-display); font-weight: 800; font-size: 1.35rem; padding: 4px 14px; border-radius: 99px; background: var(--surface); border: 2px solid var(--c); }
+.tg-now.hit { border-color: var(--good); box-shadow: inset 0 -8px 0 var(--good); }
+.tg-now.hit .tg-aim { background: var(--good-soft); border-color: var(--good); color: var(--good); }
+.tg-grid, .tg-row { display: flex; flex-direction: column; gap: 6px; }
+.tg-cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 6px; }
+.tg-cell { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 4px; border-radius: 10px; border: 2px solid color-mix(in srgb, var(--c) 40%, var(--line)); background: var(--surface); }
+.tg-cell b { font-family: var(--font-display); font-size: 1rem; }
+.tg-cell small { font-size: .72rem; font-weight: 700; color: var(--muted); }
+.tg-cell.on { outline: 3px solid var(--ink); outline-offset: 1px; }
+.tg-cell.ok { background: var(--good-soft); border-color: var(--good); }
+.tg-cell.no { background: var(--bad-soft); border-color: var(--bad); }
+.tg-types { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; font-size: .9rem; color: var(--muted); }
+.tg-types b { color: var(--ink); }
+
+/* Sensibilité et test du micro */
+.mic-test { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.mic-test .level { width: 100%; }
+.mic-test-msg { font-weight: 700; color: var(--muted); text-align: center; min-height: 1.4em; }
+.mic-test-msg.ok { color: var(--good); }
+.tg-end { display: flex; flex-direction: column; gap: 8px; }
+
 </style>
 </head>
 <body>
@@ -1107,7 +1144,7 @@ const Piano = (() => {
   }
 
   /** Joue une note à l'instant `when` (secondes, horloge audio). */
-  function note(midi, when, dur, vel = 0.8, release = 0.22) {
+  function note(midi, when, dur, vel = 0.8, release = 0.22, dest = null) {
     const s = nearest(midi);
     const src = ctx.createBufferSource();
     src.buffer = buffers.get(s);
@@ -1116,7 +1153,7 @@ const Piano = (() => {
     g.gain.setValueAtTime(vel, when);
     // Relâchement doux, comme un étouffoir de piano qui retombe (pas de coupure nette).
     g.gain.setTargetAtTime(0, when + dur, release);
-    src.connect(g); g.connect(out);
+    src.connect(g); g.connect(dest || out);
     src.start(when);
     src.stop(when + dur + 1.4);
     const v = { src, g };
@@ -1154,7 +1191,7 @@ const Piano = (() => {
     return new Promise((res) => { timers.push(setTimeout(res, (end + tail) * 1000 + 50)); });
   }
 
-  return { init, unlock, note, stopAll, sequence, get ctx() { return ctx; } };
+  return { init, unlock, note, stopAll, sequence, get ctx() { return ctx; }, get out() { return out; } };
 })();
 
 /* Hear-Trainer — application */
@@ -1194,10 +1231,10 @@ const Piano = (() => {
     harmonyMode: 'cadence', // v2 seulement : 'cadence' (cadence puis question libre) ou 'grid' (grille d'accords)
   };
   const IMPROV_BUILTIN = [
-    { id: 'improv', type: 'improv', glyph: '⇄', title: 'Question-réponse', sub: 'L\'app lance une phrase en suspens, tu improvises la réponse à ton instrument' },
-    // Version d'essai : à supprimer (cette ligne suffit) si elle n'est pas retenue.
+    // L'ancienne Question-réponse (id 'improv') a été retirée en v1.12.0 ; la v2 (id 'improv2') la remplace.
     { id: 'loop', type: 'loop', glyph: '↻', title: 'Boucle d\'accords', sub: 'Une boucle d\'accords joue en continu : improvise par-dessus (backing track)' },
-    { id: 'improv2', type: 'improv', variant: 'v2', glyph: '⇄²', title: 'Question-réponse v2 (essai)', sub: 'Deux modes : cadence seule, ou grille d\'accords commune à la question et à ta réponse' },
+    { id: 'targets', type: 'targets', glyph: '◎', title: 'Notes cibles', sub: 'Une boucle d\'accords tourne : vise la fondamentale, la tierce ou la quinte de chaque accord (micro)' },
+    { id: 'improv2', type: 'improv', variant: 'v2', glyph: '⇄', title: 'Question-réponse', sub: 'L\'app lance une phrase en suspens, tu improvises la réponse : après une cadence seule, ou sur une grille d\'accords' },
   ];
   const SING_DEFAULTS = {
     singMode: 'imagine', voice: 'low', singScale: 'major', degrees: [0, 2, 4], seqLen: 1,
@@ -1210,7 +1247,7 @@ const Piano = (() => {
   ];
   const INST_DEFAULTS = {
     instrument: 'guitar', guitarRange: '12', context: 'none', pool: 'all', mode: 'major',
-    tonalite: 'random-not-c', changeKey: 'exercise', octaveExact: false, hold: 2, questions: 20, articulation: 'legato',
+    tonalite: 'random-not-c', changeKey: 'exercise', octaveExact: false, hold: 0.5, questions: 20, articulation: 'legato',
   };
   const MEL_DEFAULTS = {
     scale: 'major', level: 'medium', count: 'auto', tempo: 'medium', accomp: false,
@@ -1231,6 +1268,12 @@ const Piano = (() => {
     const old = Store.get('settings:' + from, null);
     if (old && old[k] === v && !Store.get('settings:' + to, null)) Store.set('settings:' + to, old);
   });
+  // v1.11 : tenue par défaut 0,5 s dans Instrument + micro (1 s était trop long à la guitare) ; une seule fois.
+  if (!Store.get('mig:hold05', false)) {
+    const inst = Store.get('settings:inst', null);
+    if (inst) Store.set('settings:inst', { ...inst, hold: 0.5 });
+    Store.set('mig:hold05', true);
+  }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const savedList = () => Store.get('saved', []);
   const findEx = (id) => BUILTIN.find((e) => e.id === id) || CHORD_BUILTIN.find((e) => e.id === id) || INST_BUILTIN.find((e) => e.id === id) || MEL_BUILTIN.find((e) => e.id === id) || SING_BUILTIN.find((e) => e.id === id) || IMPROV_BUILTIN.find((e) => e.id === id) || savedList().find((e) => e.id === id);
@@ -1277,7 +1320,7 @@ const Piano = (() => {
   function pushScreen() { try { history.pushState({ s: screen }, ''); } catch (e) {} }
 
   function goHome() {
-    improvStop(); loopStop();
+    improvStop(); loopStop(); targetStop(); micTestStop();
     micStop();
     if (S && CUR && !CUR.recorded) recordSession(true);
     Piano.stopAll(); S = null; screen = HOME.cat ? 'cat' : 'home'; renderHome();
@@ -1296,6 +1339,7 @@ const Piano = (() => {
     const dur = Math.round((Date.now() - CUR.start) / 1000);
     let score, total;
     if (S.type === 'improv' || S.type === 'loop') { score = S.stats.tonic; total = S.stats.done; }
+    else if (S.type === 'targets') { score = S.hits; total = S.done; }
     else if (partial) { total = Math.max(0, (S.i || 1) - 1 - (S.skipped || 0)); score = Math.min(S.firstTry || 0, total); }
     else { score = S.firstTry; total = S.n - (S.skipped || 0); }
     if (partial && dur < 15 && !total) return;
@@ -1307,7 +1351,7 @@ const Piano = (() => {
   }
   function weakLabel(n) {
     if (S.type === 'chords') return chordLabel(Number(n));
-    if (S.type === 'instrument' || S.type === 'sing') return String(n);
+    if (S.type === 'instrument' || S.type === 'sing' || S.type === 'targets') return String(n);
     return M.label(Number(n), (S.set && S.set.notation) || 'degres');
   }
 
@@ -1317,7 +1361,7 @@ const Piano = (() => {
     { id: 'acc', deg: 3, glyph: 'IV', name: 'Accords', step: 'Reconnaître les accords', sub: 'Degrés d\'accords et enchaînements', ids: ['ch-maj', 'ch-min', 'ch-custom'], types: ['chords'] },
     { id: 'mel', deg: 2, glyph: '♫', name: 'Mélodies', step: 'Retenir une mélodie', sub: 'Dictée, aux boutons ou à l\'instrument', ids: ['mel', 'mel-inst'], types: ['melody'] },
     { id: 'voi', deg: 1, glyph: '♩', name: 'Voix & instrument', step: 'Chanter et jouer', sub: 'Ta voix, ta guitare, ton mélodica', ids: ['sing', 'sing-repeat', 'inst'], types: ['sing', 'instrument'] },
-    { id: 'imp', deg: 4, glyph: '⇄', name: 'Improviser', step: 'Improviser', sub: 'Question-réponse en rythme', ids: ['loop', 'improv', 'improv2'], types: ['improv'] },
+    { id: 'imp', deg: 4, glyph: '⇄', name: 'Improviser', step: 'Improviser', sub: 'Question-réponse en rythme', ids: ['loop', 'targets', 'improv2'], types: ['improv', 'targets'] },
   ];
   const MINE = { id: 'mine', deg: 6, glyph: '★', name: 'Mes exercices', sub: 'Tes réglages enregistrés' };
   const catExercises = (c) => (c.id === 'mine' ? savedList().map((e) => ({ ...e, glyph: '★', sub: summary(e) })) : c.ids.map(findEx).filter(Boolean));
@@ -1350,7 +1394,7 @@ const Piano = (() => {
     const order = CATS.flatMap((c) => c.ids);
     const tried = [], untried = [];
     order.forEach((id) => {
-      if (id === 'improv' || id === 'loop') return; // une seule Question-réponse (la v2) ; la boucle n'a pas de score
+      if (id === 'loop') return; // la boucle n'a pas de score
       const ex = findEx(id); if (!ex) return;
       const mine = hist.filter((h) => h.exId === id).slice(-5);
       if (!mine.length) { untried.push({ ex, why: 'Pas encore essayé' }); return; }
@@ -1392,7 +1436,7 @@ const Piano = (() => {
   }
 
   function renderTabToday() {
-    const last = findEx(Store.get('lastEx', ''));
+    const last = findEx(Store.get('lastEx', '') === 'improv' ? 'improv2' : Store.get('lastEx', ''));
     const sug = suggestions();
     const days = weekMinutes();
     const max = Math.max(...days.map((d) => d.sec), 1);
@@ -1484,6 +1528,11 @@ const Piano = (() => {
       screen = 'setup'; pushScreen();
       return renderSetup();
     }
+    if (ex.type === 'targets') {
+      draft = { ex, settings: { ...TARGET_DEFAULTS, ...Store.get('settings:' + id, {}) } };
+      screen = 'setup'; pushScreen();
+      return renderSetup();
+    }
     if (ex.type === 'loop') {
       draft = { ex, settings: { ...LOOP_DEFAULTS, ...Store.get('settings:' + id, {}) } };
       screen = 'setup'; pushScreen();
@@ -1532,13 +1581,21 @@ const Piano = (() => {
   const seg = (key, opts, val) => `<div class="seg">${opts.map(([v, l]) =>
     `<button data-act="set" data-k="${key}" data-v="${v}" aria-pressed="${String(v) === String(val)}">${l}</button>`).join('')}</div>`;
 
+  const usesMic = (ex, st) => ex.type === 'instrument' || ex.type === 'sing' || ex.type === 'improv' || (ex.type === 'targets' && st.mic !== false) || (ex.type === 'melody' && st.answerMode === 'instrument');
   function renderSetup() {
+    renderSetupBody();
+    if (!draft || screen !== 'setup' || !usesMic(draft.ex, draft.settings)) return micTestStop();
+    const start = $app.querySelector('[data-act=start]');
+    if (start) start.insertAdjacentHTML('beforebegin', micSensHtml());
+  }
+  function renderSetupBody() {
     if (isChords(draft.ex)) return renderSetupChords();
     if (draft.ex.type === 'instrument') return renderSetupInstrument();
     if (draft.ex.type === 'melody') return renderSetupMelody();
     if (draft.ex.type === 'sing') return renderSetupSing();
     if (draft.ex.type === 'improv') return renderSetupImprov();
     if (draft.ex.type === 'loop') return renderSetupLoop();
+    if (draft.ex.type === 'targets') return renderSetupTargets();
     const { ex, settings: s } = draft;
     const editable = ex.custom || ex.saved;
     const presets = [['major', 'Majeur'], ['minor', 'Mineur nat.'], ['harmonic', 'Mineur harm.'], ['melodic', 'Mineur mél.'], ['all', 'Les 12'], ['none', 'Aucune']];
@@ -1597,11 +1654,11 @@ const Piano = (() => {
   function setSetting(k, v) {
     const s = draft.settings;
     if (k === 'mode' && draft.ex.type !== 'instrument') draft.mode = v;
-    else if (k === 'scale' && (draft.ex.type === 'melody' || draft.ex.type === 'improv' || draft.ex.type === 'loop')) s.scale = v;
+    else if (k === 'scale' && (draft.ex.type === 'melody' || draft.ex.type === 'improv' || draft.ex.type === 'loop' || draft.ex.type === 'targets')) s.scale = v;
     else if (k === 'scale') draft.scale = v;
     else if (k === 'mode' && draft.ex.type === 'instrument') s.mode = v;
-    else if (k === 'octaves' || k === 'questions' || k === 'seqLength' || k === 'hold' || k === 'seqLen' || k === 'bars' || k === 'bpc' || k === 'bpm' || k === 'keyPc') s[k] = Number(v);
-    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones' || k === 'metro') s[k] = v === 'true';
+    else if (k === 'octaves' || k === 'questions' || k === 'seqLength' || k === 'hold' || k === 'seqLen' || k === 'bars' || k === 'bpc' || k === 'bpm' || k === 'keyPc' || k === 'rounds') s[k] = Number(v);
+    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones' || k === 'metro' || k === 'strict' || k === 'mic') s[k] = v === 'true';
     else if (k === 'count') s[k] = v === 'auto' ? 'auto' : Number(v);
     else s[k] = v;
     persistDraft(); renderSetup();
@@ -1643,6 +1700,7 @@ const Piano = (() => {
   let S = null;
 
   async function startSession() {
+    micTestStop();
     beginSession();
     if (isChords(draft.ex)) return startChordSession();
     if (draft.ex.type === 'instrument') return startInstrumentSession();
@@ -1650,6 +1708,7 @@ const Piano = (() => {
     if (draft.ex.type === 'sing') return startSingSession();
     if (draft.ex.type === 'improv') return startImprovSession();
     if (draft.ex.type === 'loop') return startLoopSession();
+    if (draft.ex.type === 'targets') return startTargetSession();
     const { ex, settings } = draft;
     if (ex.saved) { // garder les derniers réglages de l'exercice enregistré
       const list = savedList(); const i = list.findIndex((e) => e.id === ex.id);
@@ -2103,7 +2162,8 @@ const Piano = (() => {
         <div class="setting"><span class="lbl">Octave</span>
           ${seg('octaveExact', [['false', 'Le nom de la note suffit'], ['true', 'Octave exacte']], s.octaveExact)}</div>
         <div class="setting"><span class="lbl">Tenir la note</span>
-          ${seg('hold', [[1, '1 s'], [2, '2 s'], [3, '3 s']], s.hold)}</div>
+          ${seg('hold', [[0.5, '0,5 s'], [1, '1 s'], [2, '2 s'], [3, '3 s']], s.hold)}
+          <p class="hint">Le temps pendant lequel la bonne note doit sonner pour être validée. 0,5 s convient bien à la guitare, dont le son s'éteint vite.</p></div>
         <div class="setting"><span class="lbl">Jeu du piano</span>
           ${seg('articulation', [['legato', 'Lié (legato)'], ['staccato', 'Détaché (staccato)']], s.articulation)}</div>
         <div class="setting"><label for="q-num">Nombre de questions</label>
@@ -2116,6 +2176,53 @@ const Piano = (() => {
 
   /* --- Micro --- */
   const Mic = { stream: null, analyser: null, buf: null, timer: null };
+
+  /* Sensibilité du micro : un seul réglage pour toute l'app (dépend du téléphone et de l'instrument). */
+  const SENS = {
+    low: { label: 'Faible', rms: 0.012, clar: 0.05 },
+    normal: { label: 'Normale', rms: 0.006, clar: 0 },
+    high: { label: 'Forte', rms: 0.003, clar: -0.05 },
+    max: { label: 'Très forte', rms: 0.0015, clar: -0.12 },
+  };
+  const sens = () => SENS[Store.get('micSens', 'high')] || SENS.high;
+  /** Lecture du micro avec la sensibilité choisie. */
+  function micDetect() {
+    Mic.analyser.getFloatTimeDomainData(Mic.buf);
+    return Pitch.detect(Mic.buf, Piano.ctx.sampleRate, 70, 1500, 0.15, sens().rms);
+  }
+  const clarOk = (r, base) => r && r.clarity > base + sens().clar;
+
+  const MT = { timer: 0 }; // test du micro dans les réglages
+  function micTestStop() { clearInterval(MT.timer); MT.timer = 0; }
+  async function micTestStart() {
+    try { await Piano.unlock(); await micStart(); } catch (e) { const el = document.getElementById('mic-test-msg'); if (el) el.textContent = 'Micro refusé ou indisponible (il ne marche pas dans la page épinglée de Claude).'; return; }
+    micTestStop();
+    let lastOk = 0;
+    MT.timer = setInterval(() => {
+      const msg = document.getElementById('mic-test-msg'), lvl = document.getElementById('mic-test-lvl');
+      if (!msg || !Mic.analyser) return micTestStop();
+      const r = micDetect();
+      Mic.analyser.getFloatTimeDomainData(Mic.buf);
+      let q = 0; for (let i = 0; i < Mic.buf.length; i += 4) q += Mic.buf[i] * Mic.buf[i];
+      const level = Math.sqrt(q / (Mic.buf.length / 4));
+      if (lvl) lvl.style.width = Math.min(100, Math.round(level * 400)) + '%';
+      const ok = clarOk(r, 0.8);
+      if (ok) lastOk = performance.now();
+      msg.textContent = performance.now() - lastOk < 400 ? '✓ Note reconnue' : level > sens().rms * 0.6 ? 'Son trop faible ou pas assez net' : 'Joue une note…';
+      msg.className = 'mic-test-msg' + (performance.now() - lastOk < 400 ? ' ok' : '');
+    }, 60);
+    const b = document.querySelector('[data-act=mic-test]'); if (b) b.textContent = 'Test en cours…';
+  }
+  function micSensHtml() {
+    const cur = Store.get('micSens', 'high');
+    return `<div class="panel mic-sens">
+      <div class="setting"><span class="lbl">Sensibilité du micro</span>
+        <div class="seg">${Object.entries(SENS).map(([k, v]) => `<button data-act="mic-sens" data-v="${k}" aria-pressed="${k === cur}">${v.label}</button>`).join('')}</div>
+        <p class="hint">Réglage commun à tous les exercices avec micro. Plus c'est sensible, plus les notes jouées doucement sont reconnues ; trop sensible, un bruit de la pièce peut être pris pour une note.</p>
+        <div class="mic-test"><button class="btn secondary" data-act="mic-test">${MT.timer ? 'Test en cours…' : 'Tester le micro'}</button>
+          <div class="level"><i id="mic-test-lvl"></i></div><span id="mic-test-msg" class="mic-test-msg">${MT.timer ? 'Joue une note…' : 'Joue une note pour vérifier qu\'elle est reconnue.'}</span></div></div>
+    </div>`;
+  }
 
   async function micStart() {
     if (Mic.analyser) return true;
@@ -2205,8 +2312,7 @@ const Piano = (() => {
 
   function listenTick() {
     if (!S || (S.type !== 'instrument' && S.type !== 'sing' && !melMic()) || !Mic.analyser) return;
-    Mic.analyser.getFloatTimeDomainData(Mic.buf);
-    const r = Pitch.detect(Mic.buf, Piano.ctx.sampleRate);
+    const r = micDetect();
     const lvl = document.getElementById('lvl');
     if (S.type === 'sing' || S.type === 'melody') { if (lvl) lvl.style.width = Math.min(100, Math.round((r ? r.rms : 0) * 400)) + '%'; return S.type === 'sing' ? singTick(r) : melTick(r); }
     if (lvl) lvl.style.width = Math.min(100, Math.round((r ? r.rms : 0) * 400)) + '%';
@@ -2214,7 +2320,7 @@ const Piano = (() => {
     if (!q || !q.listening || q.solved) return;
     const now = performance.now();
     let match = false;
-    if (r && r.clarity > 0.8) {
+    if (clarOk(r, 0.8)) {
       const m = Pitch.toMidi(r.freq);
       const diff = S.set.octaveExact ? m - q.midi : ((M.mod(m - q.midi + 6, 12)) - 6);
       match = Math.abs(diff) <= 0.4;
@@ -2300,7 +2406,7 @@ const Piano = (() => {
       </div>
       <div class="ring-wrap" id="ring-wrap">
         <svg viewBox="0 0 110 110" class="ring"><circle cx="55" cy="55" r="48" class="ring-bg"/><circle id="ring" cx="55" cy="55" r="48" class="ring-fg" style="stroke-dashoffset:301.6"/></svg>
-        <div class="ring-center"><span class="reveal" id="reveal" hidden></span><span class="ring-hint">${s.context === 'tonic' ? 'tonique' : 'note'} · tiens ${s.hold} s</span></div>
+        <div class="ring-center"><span class="reveal" id="reveal" hidden></span><span class="ring-hint">${s.context === 'tonic' ? 'tonique' : 'note'} · tiens ${String(s.hold).replace('.', ',')} s</span></div>
       </div>
       <div class="level" aria-label="Niveau du micro"><i id="lvl"></i></div>
       <div class="controls">
@@ -2706,7 +2812,7 @@ const Piano = (() => {
     const now = performance.now();
     const target = q.midis[q.pos];
     let match = false, diff = null;
-    if (r && r.clarity > 0.75) {
+    if (clarOk(r, 0.75)) {
       const m = Pitch.toMidi(r.freq);
       diff = M.mod(m - target + 6, 12) - 6;
       match = Math.abs(diff) <= SING_TOL[S.set.tol || 'loose'];
@@ -2827,7 +2933,7 @@ const Piano = (() => {
     const now = performance.now();
     const mic = q.mic;
     let note = null;
-    if (r && r.clarity > 0.85) {
+    if (clarOk(r, 0.85)) {
       const m = Pitch.toMidi(r.freq), n = Math.round(m);
       if (Math.abs(m - n) <= 0.4) note = n;
     }
@@ -3057,6 +3163,249 @@ const Piano = (() => {
       ${s.tonalite === 'random' || s.tonalite === 'random-not-c' ? '<button class="link-btn" data-act="loop-key" style="align-self:center">Autre tonalité</button>' : ''}`;
   }
 
+  /* ---------- Notes cibles : viser une note de chaque accord sur une boucle (micro) ---------- */
+  const TARGET_DEFAULTS = {
+    loop: 'surprise', bpc: 1, bpm: 70, scale: 'major', tonalite: 'random-not-c', keyPc: 0, showKey: true,
+    style: 'hold', metro: true, rounds: 2, target: 'third', help: true, strict: false, mic: true,
+  };
+  const TGT = { pump: 0, det: 0, wake: null };
+  const TYPE_LBL = ['fondamentale', 'tierce', 'quinte'];
+  const TYPE_SHORT = ['F', 'T', 'Q'];
+  const HIT_MS = 300; // note stable pendant 0,3 s pour être validée
+
+  function renderSetupTargets() {
+    const { ex, settings: s } = draft;
+    const sc = M.SCALES[s.scale].notes;
+    const romans = (l) => l.chords.map((d) => M.triad(sc, d).name).join(' – ');
+    const list = loopList(s.scale);
+    if (s.loop !== 'surprise' && !list.some((l) => l.name === s.loop)) s.loop = 'surprise';
+    const tHint = { root: 'Toujours la fondamentale de l\'accord (ex. ii → 2).', third: 'Toujours la tierce de l\'accord (ex. ii → 4) : la note qui donne sa couleur à l\'accord.', fifth: 'Toujours la quinte de l\'accord (ex. ii → 6).', mixed: 'L\'app choisit au hasard pour chaque accord : fondamentale, tierce ou quinte.', path: 'L\'app choisit la note de l\'accord la plus proche de la cible précédente : on enchaîne les accords sans sauter, comme le font les improvisateurs.' }[s.target];
+    $app.innerHTML = `
+      <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
+      <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
+      <p class="hint">Une boucle d'accords tourne ; pour chaque accord, joue la note demandée à ton instrument, à n'importe quelle octave. Tu peux jouer d'autres notes autour : seule la cible compte.</p>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Écoute du micro</span>
+          ${seg('mic', [['true', 'Oui'], ['false', 'Non']], s.mic)}
+          <p class="hint">${s.mic ? 'L\'app écoute ce que tu joues et compte les cibles touchées. <b>Écouteurs nécessaires</b> : sans eux, le micro entendrait le piano. Sans écouteurs, choisis « Non ».' : 'Entraînement libre : les accords et la note à viser, sans écoute ni score. La boucle tourne jusqu\'à ce que tu arrêtes ; pas besoin d\'écouteurs.'}</p></div>
+        <div class="setting"><span class="lbl">Cible</span>
+          ${seg('target', [['root', 'Fondamentale'], ['third', 'Tierce'], ['fifth', 'Quinte'], ['mixed', 'Mélangé'], ['path', 'Chemin le plus court']], s.target)}
+          <p class="hint">${tHint}</p></div>
+        <div class="setting"><span class="lbl">Aide</span>
+          ${seg('help', [['true', 'Avec la note'], ['false', 'Sans la note']], s.help)}
+          <p class="hint">${s.help ? 'La note à jouer est donnée en degré (ex. « tierce = 4 »).' : 'Seul le type de note est affiché (ex. « tierce ») : à toi de la retrouver.'}</p></div>
+        ${s.mic ? `<div class="setting"><span class="lbl">Quand</span>
+          ${seg('strict', [['false', 'Pendant l\'accord'], ['true', 'Sur le premier temps']], s.strict)}</div>
+        <div class="setting"><span class="lbl">Longueur</span>
+          ${seg('rounds', [[2, '2 tours'], [4, '4 tours'], [0, 'En continu']], s.rounds)}</div>` : ''}
+      </div>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Gamme</span>${seg('scale', SCALE_OPTS, s.scale)}</div>
+        <div class="setting"><span class="lbl">Boucle</span>
+          <div class="loop-list">${[['surprise', 'Surprends-moi', 'Une des boucles ci-dessous, tirée au hasard']].concat(list.map((l) => [l.name, l.name, romans(l)])).map(([v, t, sub]) =>
+            `<button data-act="set" data-k="loop" data-v="${esc(v)}" aria-pressed="${s.loop === v}"><b>${esc(t)}</b><span>${esc(sub)}</span></button>`).join('')}</div></div>
+        <div class="setting"><span class="lbl">Mesures par accord</span>
+          ${seg('bpc', [[1, '1 mesure'], [2, '2 mesures'], [4, '4 mesures']], s.bpc)}</div>
+        <div class="setting"><label for="bpm">Tempo</label>
+          <div class="row-gap">${seg('bpm', [[60, 'Lent'], [70, 'Moyen'], [90, 'Rapide']], s.bpm)}
+          <input id="bpm" class="num" type="number" min="40" max="200" inputmode="numeric" value="${s.bpm}" aria-label="Tempo en battements par minute"><span class="muted">BPM</span></div></div>
+      </div>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Tonalité</span>
+          ${seg('tonalite', [['do', 'Do'], ['random-not-c', 'Aléatoire sauf Do'], ['random', 'Aléatoire'], ['choose', 'Je choisis']], s.tonalite)}
+          ${s.tonalite === 'choose' ? `<div class="notes12">${Array.from({ length: 12 }, (_, pc) =>
+            `<button data-act="set" data-k="keyPc" data-v="${pc}" aria-pressed="${s.keyPc === pc}">${esc(M.noteName(pc, M.SCALES[s.scale].mode))}</button>`).join('')}</div>` : ''}</div>
+        <div class="setting"><span class="lbl">Afficher la tonalité</span>${seg('showKey', [['true', 'Oui'], ['false', 'Non']], s.showKey)}</div>
+        <div class="setting"><span class="lbl">Accompagnement</span>
+          ${seg('style', [['hold', 'Accords tenus'], ['pulse', 'Sur chaque temps'], ['boom', 'Boum-tchak'], ['arp', 'Arpèges']], s.style)}</div>
+        <div class="setting"><span class="lbl">Métronome</span>${seg('metro', [['true', 'Oui'], ['false', 'Non']], s.metro)}</div>
+      </div>
+      ${s.mic ? '<p class="hint">Le micro ne fonctionne pas dans la page épinglée de Claude : ouvre « Ouvrir Hear-Trainer.html » sur ton Mac, ou l\'app installée sur ton téléphone.</p>' : ''}
+      <button class="btn wide" data-act="start">Commencer</button>`;
+  }
+
+  async function startTargetSession() {
+    const s = { ...draft.settings };
+    const sc = M.SCALES[s.scale].notes;
+    S = {
+      type: 'targets', title: 'Notes cibles', set: s, mode: M.SCALES[s.scale].mode, resScale: sc,
+      n: 0, i: 0, firstTry: 0, missed: {}, token: 0, stats: { done: 0, tonic: 0 },
+      keyPc: s.tonalite === 'choose' ? s.keyPc : M.pickKey(s.tonalite, null),
+      running: false, finished: false, loop: null, abs: -1, hits: 0, done: 0, targets: [], results: [],
+    };
+    pickLoop();
+    screen = 'play'; pushScreen();
+    $app.innerHTML = `<div class="loading">Chargement du piano${s.mic ? ' et du micro' : ''}…</div>`;
+    await Piano.unlock();
+    if (!S) return;
+    if (s.mic) { try { await micStart(); } catch (e) { return micError(e); } }
+    renderPlayTargets();
+  }
+
+  function targetStop() {
+    clearInterval(TGT.pump); TGT.pump = 0; clearInterval(TGT.det); TGT.det = 0;
+    if (TGT.wake) { try { TGT.wake.release(); } catch (e) {} TGT.wake = null; }
+    if (S && S.type === 'targets') S.running = false;
+  }
+
+  /** Cible d'une case (accord n° slot) : type (0 fondamentale, 1 tierce, 2 quinte) et note (demi-tons depuis la tonique). */
+  function targetFor(slot) {
+    if (S.targets[slot]) return S.targets[slot];
+    const ch = S.chords[slot % S.chords.length], t = S.set.target;
+    let idx;
+    if (t === 'root') idx = 0; else if (t === 'third') idx = 1; else if (t === 'fifth') idx = 2;
+    else if (t === 'mixed') idx = Math.floor(Math.random() * 3);
+    else {
+      const prev = slot > 0 ? targetFor(slot - 1) : null;
+      if (!prev) idx = 1;
+      else {
+        const dist = (a, b) => { const d = M.mod(a - b, 12); return Math.min(d, 12 - d); };
+        const pref = [1, 0, 2]; // à distance égale : tierce, puis fondamentale, puis quinte
+        idx = pref.reduce((best, i) => (dist(ch.pcs[i], prev.pc) < dist(ch.pcs[best], prev.pc) ? i : best), pref[0]);
+      }
+    }
+    return (S.targets[slot] = { idx, pc: ch.pcs[idx], d: ch.d, name: ch.name });
+  }
+
+  function startTargets() {
+    targetStop(); Piano.stopAll();
+    const s = S.set, ctx = Piano.ctx, beat = 60 / s.bpm, chordDur = 4 * s.bpc * beat;
+    const slotDur = chordDur;
+    const T0 = ctx.currentTime + 0.25, start = T0 + 4 * beat;
+    for (let b = 0; b < 4; b++) improvClick(T0 + b * beat, b === 0);
+    if (CUR) { CUR.recorded = false; CUR.start = Date.now(); }   // chaque série compte comme une séance
+    Object.assign(S, { running: true, finished: false, beat, chordDur, slotDur, start, next: 0, nextAt: start, abs: -1,
+      targets: [], results: [], hits: 0, done: 0, total: s.mic && s.rounds ? s.rounds * S.chords.length : Infinity, hold: 0, lastMatch: 0, hitNow: false });
+    const pump = () => {
+      while (S && S.running && S.next < S.total && S.nextAt < Piano.ctx.currentTime + 0.8) {
+        scheduleLoopChord(S.next % S.chords.length, S.nextAt, beat);
+        S.next++; S.nextAt += slotDur;
+      }
+    };
+    pump(); TGT.pump = setInterval(pump, 120);
+    TGT.det = setInterval(targetTick, 40);
+    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then((w) => { TGT.wake = w; }).catch(() => {}); } catch (e) {}
+    renderPlayTargets();
+  }
+
+  function closeSlot(slot) {
+    if (!S.set.mic || slot < 0 || S.results[slot] !== undefined) return;
+    const hit = !!S.hitNow;
+    S.results[slot] = hit; S.done++; if (hit) S.hits++;
+    else { const tg = targetFor(slot); const key = `${tg.name} (${TYPE_LBL[tg.idx]})`; S.missed[key] = (S.missed[key] || 0) + 1; }
+  }
+
+  function targetTick() {
+    if (!S || S.type !== 'targets' || !S.running) return;
+    const now = Piano.ctx.currentTime, s = S.set, beat = S.beat;
+    const dots = $app.querySelectorAll('.beat-dot'), phase = $app.querySelector('#phase');
+    if (now < S.start) {
+      const b = Math.max(0, Math.floor((now - (S.start - 4 * beat)) / beat));
+      dots.forEach((d, k) => d.classList.toggle('on', k === b));
+      if (phase) phase.textContent = String(Math.min(4, b + 1));
+      return;
+    }
+    const slot = Math.floor((now - S.start) / S.slotDur);
+    if (slot !== S.abs) {
+      closeSlot(S.abs);
+      if (slot >= S.total) return finishTargets();
+      S.abs = slot; S.hold = 0; S.lastMatch = 0; S.hitNow = false; S.firstMatch = null;
+      targetFor(slot + 1);
+      renderPlayTargets();
+      return;
+    }
+    const inSlot = now - S.start - slot * S.slotDur;
+    const pos = inSlot / beat;
+    dots.forEach((d, k) => d.classList.toggle('on', k === ((Math.floor(pos) % 4) + 4) % 4));
+    if (!s.mic || !Mic.analyser || S.hitNow) return;
+    if (s.strict && (pos > 1.1)) return;                          // « sur le premier temps » : trop tard
+    const r = micDetect();
+    const lvl = document.getElementById('lvl');
+    if (lvl) lvl.style.width = Math.min(100, Math.round((r ? r.rms : 0) * 400)) + '%';
+    const tg = targetFor(slot), t = performance.now();
+    let match = false;
+    if (clarOk(r, 0.8)) { const m = Pitch.toMidi(r.freq); match = Math.abs(M.mod(m - S.t - tg.pc + 6, 12) - 6) <= 0.4; }
+    if (match) { S.hold += S.lastMatch ? Math.min(t - S.lastMatch, 120) : 40; S.lastMatch = t; }
+    else if (S.lastMatch && t - S.lastMatch > 180) { S.hold = 0; S.lastMatch = 0; }
+    if (S.hold >= HIT_MS) { S.hitNow = true; renderPlayTargets(); }
+  }
+
+  function finishTargets() {
+    targetStop(); Piano.stopAll();
+    S.finished = true; S.firstTry = S.hits; S.n = S.done;
+    recordSession(false);
+    renderPlayTargets();
+  }
+
+  function renderPlayTargets() {
+    const s = S.set, L = S.chords.length;
+    const lab = (pc) => esc(M.label(pc, 'degres'));
+    const nm = (ch) => (s.showKey === false ? '' : M.noteName(S.t + ch.pcs[0], S.mode) + chordQual(ch.pcs));
+    const head = `
+      <header class="top">
+        <button class="link-btn" data-act="home">‹ Quitter</button>
+        <span class="score">${S.set.mic && S.done ? `${S.hits} / ${S.done}` : ''}</span>
+        <span class="score">${s.bpm} BPM</span>
+      </header>
+      <div class="stage">
+        <span class="eyebrow">Notes cibles · ${esc(M.SCALES[s.scale].name.toLowerCase())}</span>
+        <span class="key">${s.showKey === false && !S.finished ? '?' : esc(M.keyName(S.keyPc, S.mode))}</span>
+      </div>`;
+    const tourGrid = (from, to) => {
+      const rows = [];
+      for (let r0 = from; r0 < to; r0 += L) rows.push(`<div class="tg-row"><span class="hint">Tour ${r0 / L + 1}</span><div class="tg-cells">${Array.from({ length: L }, (_, j) => {
+        const k = r0 + j; if (k >= to) return '';
+        const tg = targetFor(k), res = S.results[k] !== undefined ? S.results[k] : k === S.abs && S.hitNow ? true : undefined;
+        return `<span class="tg-cell${res === true ? ' ok' : res === false ? ' no' : ''}${k === S.abs && S.running ? ' on' : ''}" style="--c:var(--deg${tg.d})"><b>${esc(tg.name)}</b><small>${TYPE_SHORT[tg.idx]}${s.help || S.finished ? ' · ' + lab(tg.pc) : ''}</small></span>`; }).join('')}</div></div>`);
+      return rows.join('');
+    };
+    if (S.finished) {
+      const by = [0, 1, 2].map((i) => { const ks = S.results.map((r, k) => [r, k]).filter(([, k]) => targetFor(k).idx === i); return { i, n: ks.length, ok: ks.filter(([r]) => r).length }; }).filter((x) => x.n);
+      const shown = Math.max(0, S.done - 8 * L);
+      $app.innerHTML = head + `
+        <div class="panel" style="text-align:center;align-items:center">
+          <span class="eyebrow">Notes cibles · terminé</span>
+          <div class="big-score">${S.hits}<small> / ${S.done}</small></div>
+          <p class="muted">cibles touchées${S.done ? ` (${Math.round((100 * S.hits) / S.done)} %)` : ''}</p>
+          <div class="tg-types">${by.map((x) => `<span><b>${x.ok} / ${x.n}</b> ${TYPE_LBL[x.i]}${x.n > 1 ? 's' : ''}</span>`).join('')}</div>
+        </div>
+        <section class="ana"><span class="eyebrow">${esc(S.loop.name)}</span>${S.done ? tourGrid(shown - (shown % L), S.done) : '<p class="muted">Aucun accord joué.</p>'}
+          <span class="hint">F : fondamentale · T : tierce · Q : quinte. Vert : touchée · rouge : manquée.</span></section>
+        <div class="tg-end">
+          <button class="btn" data-act="tgt-again">Recommencer · même boucle</button>
+          <div class="actions"><button class="btn secondary" data-act="tgt-other">Autre boucle</button><button class="btn secondary" data-act="home">Quitter</button></div>
+        </div>`;
+      return;
+    }
+    const k = S.abs >= 0 ? S.abs : 0;
+    const tg = targetFor(k), tn = targetFor(k + 1);
+    const c = S.chords[k % L], cn = S.chords[(k + 1) % L];
+    const counting = S.running && S.abs < 0;
+    const tour = S.abs >= 0 ? Math.floor(S.abs / L) + 1 : 1;
+    $app.innerHTML = head + `
+      ${S.running ? '' : `<div class="loop-nav">
+        <button class="ctl" data-act="tgt-step" data-v="-1" aria-label="Boucle précédente">‹</button>
+        <div><b>${esc(S.loop.name)}</b><span class="hint">${S.loopIdx + 1} / ${S.loopCount} · ${S.chords.map((ch) => esc(ch.name)).join(' – ')}</span></div>
+        <button class="ctl" data-act="tgt-step" data-v="1" aria-label="Boucle suivante">›</button>
+      </div>`}
+      <div class="loop-now tg-now${S.hitNow ? ' hit' : ''}" style="--c:var(--deg${c.d})">
+        <span class="eyebrow">${counting ? 'Départ sur' : S.running ? 'Maintenant' : 'Premier accord'}</span>
+        <span class="loop-roman">${esc(c.name)}</span>
+        ${nm(c) ? `<span class="loop-name">${esc(nm(c))}</span>` : ''}
+        <span class="tg-aim">${S.hitNow ? '✓ ' : ''}Vise la ${TYPE_LBL[tg.idx]}${s.help ? ` = ${lab(tg.pc)}` : ''}</span>
+      </div>
+      <div class="loop-next" style="--c:var(--deg${cn.d})"><span class="muted">Ensuite</span><b>${esc(cn.name)}</b><span class="muted">${TYPE_LBL[tn.idx]}${s.help ? ' = ' + lab(tn.pc) : ''}</span></div>
+      <div class="improv-run">
+        <div class="beats">${[0, 1, 2, 3].map((b) => `<span class="beat-dot${b === 0 ? ' accent' : ''}"></span>`).join('')}</div>
+        ${S.running && !counting ? '' : `<p class="phase" id="phase">${counting ? '1' : 'Prêt ?'}</p>`}
+        <p class="hint">${S.running ? (S.total === Infinity ? `Tour ${tour}` : `Tour ${tour} / ${s.rounds}`) : `${L} accords × ${s.mic && s.rounds ? s.rounds + ' tours' : 'en continu'}${s.mic ? '' : ', sans écoute du micro'}. Joue la cible à n'importe quelle octave.`}</p>
+        ${s.mic ? '<div class="level" aria-label="Niveau du micro"><i id="lvl"></i></div>' : ''}
+      </div>
+      ${S.running ? `<div class="tg-grid">${tourGrid((tour - 1) * L, Math.min(tour * L, S.total))}</div>` : ''}
+      ${S.running ? `<button class="btn secondary wide" data-act="tgt-stop">${S.total === Infinity && s.mic ? 'Arrêter et voir le bilan' : 'Arrêter'}</button>`
+        : `<div class="actions"><button class="btn secondary" data-act="tgt-rand">Au hasard</button><button class="btn" data-act="tgt-go">C'est parti</button></div>`}`;
+  }
+
   function renderSetupImprov() {
     const { ex, settings: s } = draft;
     $app.innerHTML = `
@@ -3105,7 +3454,7 @@ const Piano = (() => {
     const s = { ...draft.settings };
     const sc = M.SCALES[s.scale].notes;
     S = {
-      type: 'improv', v2: draft.ex.variant === 'v2', grid: draft.ex.variant === 'v2' && s.harmonyMode === 'grid', title: draft.ex.variant === 'v2' ? 'Question-réponse v2' : 'Question-réponse', set: s, mode: M.SCALES[s.scale].mode, resScale: sc, notes: sc,
+      type: 'improv', v2: draft.ex.variant === 'v2', grid: draft.ex.variant === 'v2' && s.harmonyMode === 'grid', title: 'Question-réponse', set: s, mode: M.SCALES[s.scale].mode, resScale: sc, notes: sc,
       n: Math.max(1, Math.min(200, s.questions || 5)), i: 0, firstTry: 0, missed: {}, token: 0, keyPc: null,
       stats: { done: 0, tonic: 0 },
     };
@@ -3219,6 +3568,7 @@ const Piano = (() => {
         else label = `Décompte : ${Math.max(1, b + 1)}`;
         if (ph.textContent !== label) { ph.textContent = label; ph.className = 'phase ' + cls; }
       }
+      if (S.grid) showCurrentChord(q, pos);
       const bar = document.getElementById('bar-count');
       if (bar && b >= qStart) bar.textContent = b >= aStart ? `Mesure ${Math.floor((b - aStart) / 4) + 1} / ${B}` : `Mesure ${Math.floor((b - qStart) / 4) + 1} / ${B}`;
       const lvl = document.getElementById('lvl');
@@ -3255,8 +3605,9 @@ const Piano = (() => {
         const clip = data.slice(off, off + Math.max(0, len));
         const buf = ctx.createBuffer(1, Math.max(1, clip.length), sr);
         buf.copyToChannel(clip.length ? clip : new Float32Array(1), 0);
-        q.rec = buf;
         q.found = transcribe(clip, sr);
+        if (clip.length) buf.copyToChannel(processRec(clip, sr), 0);   // volume égalisé pour l'écoute
+        q.rec = buf;
       }
       q.report = improvReport(q);
       if (!q.counted) { q.counted = true; S.stats.done++; if (q.report.endsTonic) S.stats.tonic++; }
@@ -3270,9 +3621,9 @@ const Piano = (() => {
   function transcribe(data, sr) {
     const win = 2048, hop = 1024, frames = [];
     for (let i = 0; i + win <= data.length; i += hop) {
-      const r = Pitch.detect(data.subarray(i, i + win), sr, 70, 1500, 0.15, 0.01);
+      const r = Pitch.detect(data.subarray(i, i + win), sr, 70, 1500, 0.15, Math.max(0.002, sens().rms * 1.6));
       let note = null, rms = 0;
-      if (r) { rms = r.rms; const m = Pitch.toMidi(r.freq), n = Math.round(m); if (r.clarity > 0.85 && Math.abs(m - n) <= 0.45) note = n; }
+      if (r) { rms = r.rms; const m = Pitch.toMidi(r.freq), n = Math.round(m); if (clarOk(r, 0.85) && Math.abs(m - n) <= 0.45) note = n; }
       frames.push({ t: i / sr, note, rms });
     }
     const minFrames = Math.max(3, Math.round(0.08 / (hop / sr)));
@@ -3317,12 +3668,12 @@ const Piano = (() => {
   }
 
   /** Accords joués doucement, une octave sous la mélodie, pour une suite de segments { beat, dur, root }. */
-  function scheduleGrid(harmony, start, beat) {
+  function scheduleGrid(harmony, start, beat, dest = null) {
     const voiced = M.voiceProgression(S.t, harmony.map((h) => M.triad(S.resScale, h.root)));
     harmony.forEach((h, k) => {
       const at = start + h.beat * beat, dur = h.dur * beat * 0.97;
-      Piano.note(voiced[k].bass - 12, at, dur, 0.3, releaseTime());
-      voiced[k].upper.forEach((m) => Piano.note(m - 12, at, dur, 0.2, releaseTime()));
+      Piano.note(voiced[k].bass - 12, at, dur, 0.3, releaseTime(), dest);
+      voiced[k].upper.forEach((m) => Piano.note(m - 12, at, dur, 0.2, releaseTime(), dest));
     });
   }
 
@@ -3330,9 +3681,10 @@ const Piano = (() => {
     const q = S.q; if (!q || !q.rec && !q.mel) return;
     improvStop(); Piano.stopAll();
     const ctx = Piano.ctx, beat = q.beat, T = ctx.currentTime + 0.15;
+    impBuses();
     if (S.grid && q.accomp !== false) {
-      scheduleGrid(q.mel.harmony, T, beat);
-      scheduleGrid(q.mel.answerHarmony, T + 4 * S.set.bars * beat, beat);
+      scheduleGrid(q.mel.harmony, T, beat, IMP.accBus);
+      scheduleGrid(q.mel.answerHarmony, T + 4 * S.set.bars * beat, beat, IMP.accBus);
     }
     const L = S.set.articulation !== 'staccato';
     q.mel.notes.forEach((n, k) => {
@@ -3342,8 +3694,9 @@ const Piano = (() => {
     if (q.rec) playRec(T + 4 * S.set.bars * beat);
   }
   function playRec(when) {
-    const ctx = Piano.ctx, src = ctx.createBufferSource(), g = ctx.createGain();
-    g.gain.value = 1.6; src.buffer = S.q.rec; src.connect(g); g.connect(ctx.destination);
+    impBuses();
+    const src = Piano.ctx.createBufferSource();
+    src.buffer = S.q.rec; src.connect(IMP.recBus);
     src.start(when); IMP.clicks.push(src);
   }
   function playAnswerOnly() { improvStop(); Piano.stopAll(); if (S.q.rec) playRec(Piano.ctx.currentTime + 0.1); }
@@ -3353,15 +3706,92 @@ const Piano = (() => {
     (S.q.found || []).forEach((n) => Piano.note(n.midi, T + n.start, Math.max(0.2, n.dur), 0.9, releaseTime()));
   }
 
+  /** Mode grille : accord en cours (question ou réponse) en grand, et repère dans la grille. */
+  function showCurrentChord(q, pos) {
+    const el = document.getElementById('imp-chord'); if (!el) return;
+    let sec = null, harm = null, p = 0;
+    if (pos >= q.aStart && pos < q.end) { sec = 'a'; harm = q.mel.answerHarmony; p = pos - q.aStart; }
+    else if (pos >= q.qStart && pos < q.aStart) { sec = 'q'; harm = q.mel.harmony; p = pos - q.qStart; }
+    const i = harm ? harm.findIndex((h) => p >= h.beat && p < h.beat + h.dur) : -1;
+    const key = sec ? sec + i : '';
+    if (el.dataset.key === key) return;
+    el.dataset.key = key;
+    $app.querySelectorAll('.prog-chord[data-sec]').forEach((c) => c.classList.toggle('on', c.dataset.sec === sec && Number(c.dataset.i) === i));
+    if (i < 0) { el.hidden = true; return; }
+    const tri = M.triad(S.resScale, harm[i].root);
+    el.hidden = false; el.style.setProperty('--c', `var(--deg${harm[i].root})`);
+    el.querySelector('b').textContent = tri.name;
+    el.querySelector('.imp-tones').textContent = tri.pcs.map((pc) => M.label(pc, 'degres')).join(' – ');
+  }
+
+  /** Ta réponse comparée à la grille : notes rangées sous chaque accord, notes de l'accord sur les temps forts. */
+  function gridCompare(q) {
+    const harm = q.mel.answerHarmony, found = q.found || [];
+    const per = harm.map((h) => ({ h, tri: M.triad(S.resScale, h.root), notes: [] }));
+    let strongN = 0, strongCT = 0, ct = 0;
+    found.forEach((n) => {
+      const pos = n.start / q.beat;
+      let k = harm.findIndex((h) => pos + 0.15 >= h.beat && pos + 0.15 < h.beat + h.dur);
+      if (k < 0) k = pos < 0 ? 0 : harm.length - 1;
+      const isCT = per[k].tri.pcs.includes(M.mod(n.midi - S.t, 12));
+      const near = Math.round(pos), strong = Math.abs(pos - near) < 0.3 && near % 2 === 0;
+      per[k].notes.push({ midi: n.midi, ct: isCT, strong });
+      if (isCT) ct++;
+      if (strong) { strongN++; if (isCT) strongCT++; }
+    });
+    return { per, strongN, strongCT, ct, total: found.length };
+  }
+
+  /* Volume de ta réponse : porte de bruit + normalisation (une fois), compresseur à l'écoute, balance avec les accords. */
+  function processRec(clip, sr) {
+    const w = Math.max(1, Math.round(sr * 0.01)), nW = Math.ceil(clip.length / w), env = new Float32Array(nW);
+    for (let k = 0; k < nW; k++) { let s2 = 0, n = 0; for (let i = k * w; i < Math.min(clip.length, (k + 1) * w); i++) { s2 += clip[i] * clip[i]; n++; } env[k] = Math.sqrt(s2 / Math.max(1, n)); }
+    const sorted = Array.from(env).sort((a, b) => a - b);
+    const floor = sorted[Math.floor(sorted.length * 0.1)] || 0, top = sorted[sorted.length - 1] || 0;
+    const thr = Math.max(floor * 3, top * 0.06, 0.002);
+    // porte : ouverte quand ça joue, fermeture douce (150 ms) après la dernière note
+    const gate = new Float32Array(nW); let hold = 0;
+    for (let k = 0; k < nW; k++) { if (env[k] > thr) hold = 15; gate[k] = hold > 0 ? 1 : 0; if (hold > 0) hold--; }
+    const out = new Float32Array(clip.length); let g = 0, s2 = 0, n = 0, peak = 0;
+    for (let i = 0; i < clip.length; i++) {
+      const target = gate[Math.floor(i / w)]; g += (target - g) * (target > g ? 0.01 : 0.0015);
+      out[i] = clip[i] * g;
+      if (target) { s2 += out[i] * out[i]; n++; }
+      peak = Math.max(peak, Math.abs(out[i]));
+    }
+    const rms = Math.sqrt(s2 / Math.max(1, n));
+    const gain = rms > 1e-5 ? Math.min(0.16 / rms, 1.5 / Math.max(peak, 1e-5), 60) : 1;
+    for (let i = 0; i < out.length; i++) out[i] *= gain;
+    return out;
+  }
+  const getBalance = () => Store.get('impBalance', 50);
+  function impBuses() {
+    const ctx = Piano.ctx;
+    if (!IMP.accBus) { IMP.accBus = ctx.createGain(); IMP.accBus.connect(Piano.out); }
+    if (!IMP.recBus) {
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -26; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.25;
+      const makeup = ctx.createGain(); makeup.gain.value = 1.5;
+      IMP.recBus = ctx.createGain(); IMP.recBus.connect(comp); comp.connect(makeup); makeup.connect(ctx.destination);
+    }
+    applyBalance();
+  }
+  function applyBalance() {
+    if (!IMP.accBus) return;
+    const bal = S && S.grid ? getBalance() : 50, t = Piano.ctx.currentTime;
+    IMP.accBus.gain.setTargetAtTime(bal <= 50 ? 1 : (100 - bal) / 50, t, 0.03);
+    IMP.recBus.gain.setTargetAtTime(bal >= 50 ? 1 : bal / 50, t, 0.03);
+  }
+
   /** Grille d'accords de la question et de ta réponse (mode grille). */
   function improvGridHtml(q) {
     if (!S.grid || !q.mel.answerHarmony) return '';
     const bars = S.set.bars;
-    const gridRow = (harmony) => `<div class="prog-bars">${Array.from({ length: bars }, (_, b) =>
-      `<span class="prog-bar">${harmony.filter((h) => Math.floor(h.beat / 4) === b).map((h) =>
-        `<span class="prog-chord" style="--c:var(--deg${h.root})">${esc(M.triad(S.resScale, h.root).name)}</span>`).join('')}</span>`).join('')}</div>`;
+    const gridRow = (harmony, sec) => `<div class="prog-bars">${Array.from({ length: bars }, (_, b) =>
+      `<span class="prog-bar">${harmony.map((h, i) => [h, i]).filter(([h]) => Math.floor(h.beat / 4) === b).map(([h, i]) =>
+        `<span class="prog-chord" data-sec="${sec}" data-i="${i}" style="--c:var(--deg${h.root})">${esc(M.triad(S.resScale, h.root).name)}</span>`).join('')}</span>`).join('')}</div>`;
     return `<div class="dlg"><span class="dlg-who">La grille</span>
-        <div class="grid-rows"><span class="hint">Question</span>${gridRow(q.mel.harmony)}<span class="hint">Ta réponse</span>${gridRow(q.mel.answerHarmony)}</div></div>`;
+        <div class="grid-rows"><span class="hint">Question</span>${gridRow(q.mel.harmony, 'q')}<span class="hint">Ta réponse</span>${gridRow(q.mel.answerHarmony, 'a')}</div></div>`;
   }
 
   function renderPlayImprov() {
@@ -3384,6 +3814,7 @@ const Piano = (() => {
           <div class="beats">${[0, 1, 2, 3].map((k) => `<span class="beat-dot${k === 0 ? ' accent' : ''}"></span>`).join('')}</div>
           <p class="phase" id="phase">${q.phase === 'ready' ? 'Prêt ?' : q.phase === 'analyzing' ? 'J\'écoute ta réponse…' : 'Décompte'}</p>
           <p class="hint" id="bar-count">${q.phase === 'ready' ? `Décompte, cadence, question de ${s.bars} mesure${s.bars > 1 ? 's' : ''}, puis à toi pendant ${s.bars} mesure${s.bars > 1 ? 's' : ''}. L'enregistrement démarre tout seul.` : ''}</p>
+          ${S.grid && q.phase === 'running' ? '<div class="imp-chord" id="imp-chord" hidden><span class="eyebrow">Accord</span><b></b><span class="imp-tones"></span></div>' : ''}
           <div class="level" aria-label="Niveau du micro"><i id="lvl"></i></div>
         </div>
         ${q.phase === 'ready' || q.phase === 'running' ? improvGridHtml(q) : ''}
@@ -3403,6 +3834,16 @@ const Piano = (() => {
       marks.push(r.ratio >= 0.5 && r.ratio <= 1.3 ? ['✓', 'Ta réponse a une longueur proche de la question.']
         : r.ratio < 0.5 ? ['~', 'Ta réponse est plus courte que la question : tu peux prendre plus de place.'] : ['~', 'Ta réponse déborde un peu de son espace.']);
     }
+    const gc = S.grid && found.length ? gridCompare(q) : null;
+    if (gc) marks.push(!gc.strongN ? ['~', 'Aucune note sur les temps forts (1 et 3) : essaie de te poser sur une note de l\'accord au début des temps.']
+      : [gc.strongCT / gc.strongN >= 0.75 ? '✓' : '~', `Sur les temps forts, ${gc.strongCT} note${gc.strongCT > 1 ? 's' : ''} sur ${gc.strongN} ${gc.strongCT > 1 ? 'étaient' : 'était'} dans l'accord.`]);
+    const gridAns = gc ? `<div class="dlg"><span class="dlg-who">Ta réponse sur la grille</span>
+        <div class="grid-ans">${gc.per.map(({ h, tri, notes }) => `<div class="ga-col" style="--c:var(--deg${h.root})"><span class="prog-chord">${esc(tri.name)}</span>
+          <span class="ga-tones">${tri.pcs.map((pc) => esc(M.label(pc, 'degres'))).join(' ')}</span>
+          <div class="ga-notes">${notes.length ? notes.map((n) => `<span class="ga-note${n.ct ? ' ct' : ''}${n.strong ? ' strong' : ''}">${lab(n.midi)}</span>`).join('') : '<span class="muted">—</span>'}</div></div>`).join('')}</div>
+        <span class="hint">Plein : note de l'accord · pointillé : autre note · ▲ : sur un temps fort.</span></div>` : '';
+    const balance = S.grid && q.rec && q.accomp !== false ? `<div class="balance"><span>Accords</span>
+        <input id="imp-bal" type="range" min="0" max="100" step="5" value="${getBalance()}" aria-label="Balance entre les accords et ta réponse"><span>Ta réponse</span></div>` : '';
     const gridHtml = improvGridHtml(q);
     $app.innerHTML = head + `
       <section class="ana">
@@ -3411,6 +3852,7 @@ const Piano = (() => {
         <div class="dlg"><span class="dlg-who">Question</span><div class="dlg-notes">${q.midis.map((m) => `<span class="slot done-plain">${lab(m)}</span>`).join('')}</div>
           <span class="hint">Finit en suspens sur ${lab(qEnd)}.</span></div>
         <div class="dlg"><span class="dlg-who">Ta réponse <em>(lecture approximative)</em></span><div class="dlg-notes">${found.length ? found.map((n) => `<span class="slot">${lab(n.midi)}</span>`).join('') : '<span class="muted">—</span>'}</div></div>
+        ${gridAns}
         <ul class="marks">${marks.map(([k, t]) => `<li><b class="mk ${k === '✓' ? 'ok' : k === '✗' ? 'no' : ''}">${k}</b><span>${esc(t)}</span></li>`).join('')}</ul>
       </section>
       <div class="controls">
@@ -3419,6 +3861,7 @@ const Piano = (() => {
         <button class="ctl" data-act="imp-piano" ${found.length ? '' : 'disabled'}>${ICON.kbd}Ma réponse au piano</button>
         ${S.grid ? `<button class="ctl" data-act="imp-accomp" aria-pressed="${q.accomp !== false}">${ICON.cadence}Accords en fond : ${q.accomp !== false ? 'oui' : 'non'}</button>` : ''}
       </div>
+      ${balance}
       <div class="actions">
         <button class="btn secondary" data-act="imp-retry">Retenter</button>
         <button class="btn" data-act="imp-next">${S.i >= S.n ? 'Voir le bilan' : 'Question suivante'}</button>
@@ -3449,7 +3892,14 @@ const Piano = (() => {
     switch (b.dataset.act) {
       case 'home': try { history.back(); } catch (err) {} goHome(); break;
       case 'open': openSetup(b.dataset.id); break;
+      case 'mic-sens': Store.set('micSens', v); renderSetup(); break;
+      case 'mic-test': micTestStart(); break;
       case 'loop-go': S.played = true; startLoop(); break;
+      case 'tgt-go': startTargets(); break;
+      case 'tgt-stop': if (S.total === Infinity && S.set.mic) { closeSlot(S.abs); finishTargets(); } else { targetStop(); Piano.stopAll(); S.abs = -1; S.done = 0; S.hits = 0; renderPlayTargets(); } break;
+      case 'tgt-again': S.finished = false; startTargets(); break;   // même boucle, même tonalité : on relance tout de suite
+      case 'tgt-other': S.finished = false; S.abs = -1; S.done = 0; S.hits = 0; S.targets = []; S.results = []; pickLoop(); renderPlayTargets(); break;   // boucle au hasard, puis écran de départ (flèches pour choisir)
+      case 'tgt-step': case 'tgt-rand': pickLoop(b.dataset.act === 'tgt-step' ? S.loopIdx + Number(v) : undefined); S.targets = []; renderPlayTargets(); break;
       case 'loop-stop': loopStop(); Piano.stopAll(); S.abs = -1; renderPlayLoop(); break;
       case 'loop-step': case 'loop-rand': case 'loop-key': {
         const was = S.running;
@@ -3541,6 +3991,9 @@ const Piano = (() => {
       case 'again': draft && startSession(); break;
     }
   });
+  $app.addEventListener('input', (e) => {
+    if (e.target.id === 'imp-bal') { Store.set('impBalance', Number(e.target.value)); applyBalance(); }
+  });
   $app.addEventListener('change', (e) => {
     if (e.target.id === 'bpm') {
       draft.settings.bpm = Math.max(40, Math.min(200, parseInt(e.target.value, 10) || 90)); persistDraft(); renderSetup();
@@ -3551,7 +4004,7 @@ const Piano = (() => {
     }
   });
 
-  window.__ht = { get session() { return S; } }; // pour les tests automatiques
+  window.__ht = { get session() { return S; }, processRec }; // pour les tests automatiques
   renderHome();
   try { history.replaceState({ s: 'home' }, ''); } catch (e) {}
 })();
