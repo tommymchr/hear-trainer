@@ -508,6 +508,23 @@ p { margin: 0; }
 .tk-b.no { background: var(--bad); }
 .tk-w, .tk-b, .wk, .bk, .help-chords button { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 
+/* ---------- Trouver le mode ---------- */
+.mode-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.mode-pick button { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 8px 10px; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+.mode-pick button b { font-size: .84rem; }
+.mode-pick button span { font-size: .72rem; color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+.mode-pick button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.mode-pick button[aria-pressed="true"] span { color: var(--bg); opacity: .75; }
+.mode-answers { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.mode-ans { min-height: 64px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--deg5) 45%, var(--line)); background: color-mix(in srgb, var(--deg5) 12%, var(--surface)); box-shadow: inset 0 -5px 0 var(--deg5); font-family: var(--font-display); font-size: 1rem; color: var(--ink); }
+.mode-ans[disabled] { opacity: .45; }
+.mode-res { gap: 14px; }
+.mode-res > div { display: flex; flex-direction: column; gap: 6px; }
+.mode-scale { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.mode-scale span { text-align: center; padding: 7px 0; border-radius: 8px; background: var(--bg); font-family: var(--font-display); font-weight: 750; font-variant-numeric: tabular-nums; }
+.mode-scale span.char { background: color-mix(in srgb, var(--accent) 25%, var(--surface)); color: var(--accent); box-shadow: inset 0 -3px 0 var(--accent); }
+.mode-scale span.diff { text-decoration: underline 3px var(--bad); text-underline-offset: 4px; }
+
 </style>
 </head>
 <body>
@@ -1285,6 +1302,9 @@ const Piano = (() => {
     tonalite: 'random-not-c', changeKey: 'exercise', showKey: true, articulation: 'legato', questions: 5,
     harmonyMode: 'cadence', // v2 seulement : 'cadence' (cadence puis question libre) ou 'grid' (grille d'accords)
   };
+  const MODE_BUILTIN = [
+    { id: 'modes', type: 'mode', glyph: '♮', title: 'Trouver le mode', sub: 'Majeur, mineur, dorien, mixolydien… et gammes du monde : reconnais la couleur d\'un morceau' },
+  ];
   const IMPROV_BUILTIN = [
     // L'ancienne Question-réponse (id 'improv') a été retirée en v1.12.0 ; la v2 (id 'improv2') la remplace.
     { id: 'loop', type: 'loop', glyph: '↻', title: 'Boucle d\'accords', sub: 'Une boucle d\'accords joue en continu : improvise par-dessus (backing track)' },
@@ -1331,7 +1351,7 @@ const Piano = (() => {
   }
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const savedList = () => Store.get('saved', []);
-  const findEx = (id) => BUILTIN.find((e) => e.id === id) || CHORD_BUILTIN.find((e) => e.id === id) || INST_BUILTIN.find((e) => e.id === id) || MEL_BUILTIN.find((e) => e.id === id) || SING_BUILTIN.find((e) => e.id === id) || IMPROV_BUILTIN.find((e) => e.id === id) || savedList().find((e) => e.id === id);
+  const findEx = (id) => BUILTIN.find((e) => e.id === id) || CHORD_BUILTIN.find((e) => e.id === id) || INST_BUILTIN.find((e) => e.id === id) || MEL_BUILTIN.find((e) => e.id === id) || SING_BUILTIN.find((e) => e.id === id) || IMPROV_BUILTIN.find((e) => e.id === id) || MODE_BUILTIN.find((e) => e.id === id) || savedList().find((e) => e.id === id);
   const isChords = (ex) => ex && ex.type === 'chords';
 
   /** Gamme de référence pour la résolution : celle du mode, ajustée aux altérations choisies. */
@@ -1410,7 +1430,7 @@ const Piano = (() => {
   }
   function weakLabel(n) {
     if (S.type === 'chords') return chordLabel(Number(n));
-    if (S.type === 'instrument' || S.type === 'sing' || S.type === 'targets' || S.type === 'tonic') return String(n);
+    if (S.type === 'instrument' || S.type === 'sing' || S.type === 'targets' || S.type === 'tonic' || S.type === 'mode') return String(n);
     return M.label(Number(n), (S.set && S.set.notation) || 'degres');
   }
 
@@ -1420,6 +1440,7 @@ const Piano = (() => {
     { id: 'acc', deg: 3, glyph: 'IV', name: 'Accords', step: 'Reconnaître les accords', sub: 'Degrés d\'accords et enchaînements', ids: ['ch-maj', 'ch-min', 'ch-custom'], types: ['chords'] },
     { id: 'mel', deg: 2, glyph: '♫', name: 'Mélodies', step: 'Retenir une mélodie', sub: 'Dictée, aux boutons ou à l\'instrument', ids: ['mel', 'mel-inst'], types: ['melody'] },
     { id: 'voi', deg: 1, glyph: '♩', name: 'Voix & instrument', step: 'Chanter et jouer', sub: 'Ta voix, ta guitare, ton mélodica', ids: ['sing', 'sing-repeat', 'inst'], types: ['sing', 'instrument'] },
+    { id: 'scl', deg: 5, glyph: '♮', name: 'Gammes et modes', step: 'Reconnaître les modes', sub: 'La couleur d\'une gamme : modes et musiques du monde', ids: ['modes'], types: ['mode'] },
     { id: 'imp', deg: 4, glyph: '⇄', name: 'Improviser', step: 'Improviser', sub: 'Question-réponse en rythme', ids: ['loop', 'targets', 'improv2'], types: ['improv', 'targets'] },
   ];
   const MINE = { id: 'mine', deg: 6, glyph: '★', name: 'Mes exercices', sub: 'Tes réglages enregistrés' };
@@ -1548,6 +1569,8 @@ const Piano = (() => {
     chords: [{ key: 'seqLength', steps: [[1, '1 accord'], [2, 'suites de 2 accords'], [3, 'suites de 3 accords'], [4, 'suites de 4 accords'], [6, 'grilles de 6 accords'], [8, 'grilles de 8 accords']] }],
     melody: [{ key: 'level', steps: [['easy', 'Facile'], ['medium', 'Moyen'], ['hard', 'Difficile']] }],
     sing: [{ key: 'seqLen', steps: [[1, '1 degré'], [2, 'suites de 2'], [3, 'suites de 3'], [4, 'suites de 4']] }],
+    mode: [{ key: 'level', steps: [['easy', 'Facile'], ['hard', 'Difficile']] },
+      { key: 'tonic', steps: [['drone', 'tonique en bourdon'], ['first', 'tonique jouée au début'], ['none', 'tonique non donnée']] }],
     tonic: [{ key: 'level', steps: [['easy', 'Facile'], ['medium', 'Moyen'], ['hard', 'Difficile']] },
       { key: 'listen', steps: [['loop', 'écoute en boucle'], ['twice', 'écoute deux fois'], ['once', 'écoute une seule fois']] }],
     targets: [{ key: 'help', steps: [[true, 'avec la note'], [false, 'sans la note']] },
@@ -1760,6 +1783,11 @@ const Piano = (() => {
       screen = 'setup'; pushScreen();
       return renderSetup();
     }
+    if (ex.type === 'mode') {
+      draft = { ex, settings: { ...MODE_DEFAULTS, ...Store.get('settings:' + id, {}) } };
+      screen = 'setup'; pushScreen();
+      return renderSetup();
+    }
     if (ex.type === 'tonic') {
       draft = { ex, settings: { ...TONIC_DEFAULTS, ...Store.get('settings:' + id, {}) } };
       screen = 'setup'; pushScreen();
@@ -1838,6 +1866,7 @@ const Piano = (() => {
     if (draft.ex.type === 'loop') return renderSetupLoop();
     if (draft.ex.type === 'targets') return renderSetupTargets();
     if (draft.ex.type === 'tonic') return renderSetupTonic();
+    if (draft.ex.type === 'mode') return renderSetupMode();
     const { ex, settings: s } = draft;
     const editable = ex.custom || ex.saved;
     const presets = [['major', 'Majeur'], ['minor', 'Mineur nat.'], ['harmonic', 'Mineur harm.'], ['melodic', 'Mineur mél.'], ['all', 'Les 12'], ['none', 'Aucune']];
@@ -1952,6 +1981,7 @@ const Piano = (() => {
     if (draft.ex.type === 'loop') return startLoopSession();
     if (draft.ex.type === 'targets') return startTargetSession();
     if (draft.ex.type === 'tonic') return startTonicSession();
+    if (draft.ex.type === 'mode') return startModeSession();
     const { ex, settings } = draft;
     if (ex.saved) { // garder les derniers réglages de l'exercice enregistré
       const list = savedList(); const i = list.findIndex((e) => e.id === ex.id);
@@ -2149,11 +2179,11 @@ const Piano = (() => {
         <div class="big-score">${S.firstTry}<small> / ${total}</small></div>
         ${S.skipped ? `<p class="muted">${S.skipped} question${S.skipped > 1 ? 's' : ''} passée${S.skipped > 1 ? 's' : ''}, non comptée${S.skipped > 1 ? 's' : ''} dans le score</p>` : ''}
         <p class="muted">${pct} % ${S.type === 'instrument' ? 'trouvées sans voir la note' : S.type === 'sing' ? 'chantées sans aide' : 'trouvées du premier coup'}</p>
-        ${(S.type === 'instrument' || S.type === 'tonic') && S.times.length ? `<p class="muted">Temps moyen pour trouver ${S.type === 'tonic' ? 'la tonique' : 'une note'} : <b>${(S.times.reduce((a, b) => a + b, 0) / S.times.length).toFixed(1).replace('.', ',')} s</b></p>` : ''}
+        ${(S.type === 'instrument' || S.type === 'tonic' || S.type === 'mode') && S.times.length ? `<p class="muted">Temps moyen pour trouver ${S.type === 'tonic' ? 'la tonique' : S.type === 'mode' ? 'le mode' : 'une note'} : <b>${(S.times.reduce((a, b) => a + b, 0) / S.times.length).toFixed(1).replace('.', ',')} s</b></p>` : ''}
       </div>
       <div class="panel">
-        <h2>${S.type === 'tonic' ? 'Tonalités manquées' : S.type === 'instrument' ? 'Notes révélées' : S.type === 'sing' ? 'Notes écoutées avant de chanter' : 'À retravailler'}</h2>
-        ${weak.length ? `<div class="weak">${weak.map(([n, c]) => `<span>${esc(S.type === 'chords' ? chordLabel(Number(n)) : S.type === 'instrument' || S.type === 'sing' || S.type === 'tonic' ? n : M.label(Number(n), S.set.notation))} — ${c} fois</span>`).join('')}</div>`
+        <h2>${S.type === 'mode' ? 'Modes manqués' : S.type === 'tonic' ? 'Tonalités manquées' : S.type === 'instrument' ? 'Notes révélées' : S.type === 'sing' ? 'Notes écoutées avant de chanter' : 'À retravailler'}</h2>
+        ${weak.length ? `<div class="weak">${weak.map(([n, c]) => `<span>${esc(S.type === 'chords' ? chordLabel(Number(n)) : S.type === 'instrument' || S.type === 'sing' || S.type === 'tonic' || S.type === 'mode' ? n : M.label(Number(n), S.set.notation))} — ${c} fois</span>`).join('')}</div>`
           : `<p class="muted">${S.type === 'instrument' ? 'Tu as tout trouvé sans aide.' : S.type === 'sing' ? 'Tout chanté sans écouter la note.' : 'Aucune erreur sur cette série.'}</p>`}
       </div>
       ${levelUpHtml()}
@@ -4019,6 +4049,191 @@ const Piano = (() => {
       </div>`}`;
   }
 
+  /* ---------- Trouver le mode (gammes et modes) ---------- */
+  // char : degrés caractéristiques (indices 0–6) ; near : mode voisin pour la comparaison ; vamp : boucle typique (degrés).
+  const MODES = [
+    { id: 'ionian', name: 'Majeur (ionien)', short: 'Majeur', notes: [0, 2, 4, 5, 7, 9, 11], char: [], near: 'mixolydian', vamp: [[0, 3, 4, 0], [0, 4, 5, 3]] },
+    { id: 'aeolian', name: 'Mineur naturel (éolien)', short: 'Mineur', notes: [0, 2, 3, 5, 7, 8, 10], char: [5], near: 'dorian', vamp: [[0, 5, 6, 0], [0, 3, 6, 0]] },
+    { id: 'dorian', name: 'Dorien', short: 'Dorien', notes: [0, 2, 3, 5, 7, 9, 10], char: [5], near: 'aeolian', vamp: [[0, 3, 0, 3], [0, 1, 3, 0]] },
+    { id: 'phrygian', name: 'Phrygien', short: 'Phrygien', notes: [0, 1, 3, 5, 7, 8, 10], char: [1], near: 'aeolian', vamp: [[0, 1, 0, 1], [0, 1, 6, 0]] },
+    { id: 'lydian', name: 'Lydien', short: 'Lydien', notes: [0, 2, 4, 6, 7, 9, 11], char: [3], near: 'ionian', vamp: [[0, 1, 0, 1], [0, 1, 4, 0]] },
+    { id: 'mixolydian', name: 'Mixolydien', short: 'Mixolydien', notes: [0, 2, 4, 5, 7, 9, 10], char: [6], near: 'ionian', vamp: [[0, 6, 3, 0], [0, 6, 0, 6]] },
+    { id: 'harmonic', name: 'Mineur harmonique', short: 'Min. harmonique', notes: [0, 2, 3, 5, 7, 8, 11], char: [6], near: 'aeolian', vamp: [[0, 3, 4, 0], [0, 5, 4, 0]] },
+    { id: 'melodic', name: 'Mineur mélodique', short: 'Min. mélodique', notes: [0, 2, 3, 5, 7, 9, 11], char: [5, 6], near: 'harmonic', vamp: [[0, 3, 4, 0], [0, 1, 4, 0]] },
+    { id: 'phrygdom', name: 'Phrygien dominant (flamenco, oriental)', short: 'Phryg. dominant', notes: [0, 1, 4, 5, 7, 8, 10], char: [1, 2], near: 'phrygian', vamp: [[0, 1, 0, 1], [0, 1, 6, 1]], world: true },
+    { id: 'dblharm', name: 'Double harmonique (arabe)', short: 'Double harm.', notes: [0, 1, 4, 5, 7, 8, 11], char: [1, 6], near: 'phrygdom', vamp: [[0, 1, 0, 1], [0, 1, 6, 0]], world: true },
+    { id: 'hungarian', name: 'Mineur hongrois (tzigane)', short: 'Min. hongrois', notes: [0, 2, 3, 6, 7, 8, 11], char: [3, 6], near: 'harmonic', vamp: [[0, 4, 0, 4], [0, 5, 4, 0]], world: true },
+  ];
+  const modeById = (id) => MODES.find((m) => m.id === id);
+  const MODE_PRESETS = [['majmin', 'Majeur / mineur', ['ionian', 'aeolian']], ['four', '+ dorien, mixolydien', ['ionian', 'aeolian', 'dorian', 'mixolydian']],
+    ['eight', 'Les 8 modes', MODES.filter((m) => !m.world).map((m) => m.id)], ['world', 'Musiques du monde', ['phrygian', 'phrygdom', 'dblharm', 'hungarian', 'harmonic']], ['all', 'Tout', MODES.map((m) => m.id)]];
+  const MODE_DEFAULTS = { pool: ['ionian', 'aeolian', 'dorian', 'mixolydian'], context: 'both', tonic: 'drone', level: 'easy', listen: 'loop', bpm: 90, groove: 'pop', questions: 10 };
+  const MAJ = [0, 2, 4, 5, 7, 9, 11];
+  /** Chiffrage modal : ♭II, ♭VII… par rapport au majeur. */
+  function modalRoman(scale, d) { const t = M.triad(scale, d); const acc = scale[d] < MAJ[d] ? '♭' : scale[d] > MAJ[d] ? '♯' : ''; return acc + t.name; }
+  const degLabel = (scale, i) => { const acc = scale[i] < MAJ[i] ? '♭' : scale[i] > MAJ[i] ? '♯' : ''; return acc + (i + 1); };
+
+  function renderSetupMode() {
+    const { ex, settings: s } = draft;
+    const pool = s.pool || [];
+    $app.innerHTML = `
+      <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
+      <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
+      <p class="hint">Un morceau est joué : dans quel mode ou quelle gamme est-il ? Chaque mode a sa note caractéristique (ex. dorien = mineur avec une 6 majeure).</p>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Modes et gammes de l'exercice</span>
+          <div class="seg">${MODE_PRESETS.map(([k, l]) => `<button data-act="mode-preset" data-v="${k}">${l}</button>`).join('')}</div>
+          <div class="mode-pick">${MODES.map((m) => `<button data-act="mode-toggle" data-v="${m.id}" aria-pressed="${pool.includes(m.id)}"><b>${esc(m.name)}</b><span>${m.notes.map((n, i) => degLabel(m.notes, i)).join(' ')}</span></button>`).join('')}</div>
+          <p class="hint">${pool.length < 2 ? 'Choisis au moins 2 modes.' : `${pool.length} modes choisis.`}</p></div>
+        <div class="setting"><span class="lbl">Ce que tu entends</span>
+          ${seg('context', [['melody', 'Une mélodie'], ['chords', 'Des accords'], ['both', 'Mélodie + accords'], ['band', 'Un groupe']], s.context)}</div>
+        ${s.context === 'band' ? `<div class="setting"><span class="lbl">Style</span>${seg('groove', [['pop', 'Pop'], ['rock', 'Rock'], ['ballad', 'Ballade'], ['bossa', 'Bossa']], s.groove)}</div>` : ''}
+        <div class="setting"><span class="lbl">Tonique</span>
+          ${seg('tonic', [['drone', 'Bourdon (tenue en continu)'], ['first', 'Jouée au début'], ['none', 'Non donnée']], s.tonic)}
+          <p class="hint">${{ drone: 'La tonique sonne en continu dans le grave : tu entends chaque note par rapport à elle.', first: 'L\'accord de tonique est joué une fois avant la musique.', none: 'À toi de sentir la tonique avant de reconnaître le mode.' }[s.tonic]}</p></div>
+        <div class="setting"><span class="lbl">Difficulté</span>
+          ${seg('level', [['easy', 'Facile'], ['hard', 'Difficile']], s.level)}
+          <p class="hint">${s.level === 'easy' ? 'La mélodie insiste sur la tonique et sur la note caractéristique du mode.' : 'La mélodie circule librement : la note caractéristique peut être discrète.'}</p></div>
+        <div class="setting"><span class="lbl">Écoute</span>${seg('listen', [['loop', 'En boucle'], ['twice', 'Deux fois'], ['once', 'Une fois']], s.listen)}</div>
+        <div class="setting"><label for="bpm">Tempo</label>
+          <div class="row-gap">${seg('bpm', [[70, 'Lent'], [90, 'Moyen'], [115, 'Rapide']], s.bpm)}
+          <input id="bpm" class="num" type="number" min="40" max="200" inputmode="numeric" value="${s.bpm}" aria-label="Tempo en battements par minute"><span class="muted">BPM</span></div></div>
+        <div class="setting"><label for="q-num">Nombre de questions</label>
+          <div class="row-gap">${seg('questions', [5, 10, 20].map((n) => [n, n]), s.questions)}
+          <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
+      </div>
+      <button class="btn wide" data-act="start" ${pool.length < 2 ? 'disabled' : ''}>Commencer</button>`;
+  }
+
+  async function startModeSession() {
+    const s = { ...draft.settings, pool: [...draft.settings.pool] };
+    S = { type: 'mode', title: 'Trouver le mode', set: s, n: Math.max(1, Math.min(200, s.questions || 10)), i: 0, firstTry: 0, missed: {}, skipped: 0, times: [], token: 0, keyPc: null, prevMode: null };
+    screen = 'play'; pushScreen();
+    $app.innerHTML = '<div class="loading">Chargement du piano…</div>';
+    await Piano.unlock();
+    if (!S) return;
+    nextModeQuestion(true);
+  }
+
+  /** Mélodie en degrés (indices dans la gamme, 7 = octave) sur les racines de la boucle. */
+  function modeMelody(roots, mode, easy) {
+    const out = []; let cur = 7;
+    const chars = mode.char.length ? mode.char : [2];
+    roots.forEach((d, b) => {
+      const cells = Melody.CELLS[4];
+      const cell = cells[Math.floor(Math.random() * cells.length)];
+      let beat = 0;
+      cell.forEach((dur, k) => {
+        if (k === 0) {   // temps fort : note de l'accord la plus proche (au niveau facile, la tonique sur l'accord de I)
+          let best = cur, bd = 99;
+          for (let i = 3; i <= 12; i++) if ([0, 2, 4].includes(M.mod(i - d, 7)) && Math.abs(i - cur) < bd) { bd = Math.abs(i - cur); best = i; }
+          cur = easy && d === 0 && Math.random() < 0.6 ? (Math.abs(cur - 7) <= Math.abs(cur - 0) ? 7 : 0) : best;
+        } else if (easy && k === cell.length - 2) {   // facile : la note caractéristique dans chaque mesure
+          const c = chars[Math.floor(Math.random() * chars.length)];
+          cur = [c, c + 7].reduce((a, x) => (Math.abs(x - cur) < Math.abs(a - cur) ? x : a));
+        } else cur = Math.max(2, Math.min(13, cur + (Math.random() < 0.5 ? -1 : 1) * (Math.random() < 0.8 ? 1 : 2)));
+        out.push({ idx: cur, beat: 4 * b + beat, dur });
+        beat += dur;
+      });
+    });
+    return out;
+  }
+
+  function nextModeQuestion(first) {
+    const s = S.set;
+    tonicStop();
+    const pool = s.pool.filter((id) => id !== S.prevMode || s.pool.length < 3);
+    const mode = modeById(pool[Math.floor(Math.random() * pool.length)]);
+    S.prevMode = mode.id;
+    S.keyPc = M.pickKey('random', S.keyPc); S.t = M.tonicMidi(S.keyPc); S.mode = 'major';
+    const roots = mode.vamp[Math.floor(Math.random() * mode.vamp.length)];
+    S.q = { mode, roots, mel: modeMelody(roots, mode, s.level === 'easy'), phase: 'ready', helped: false, answered: false, picked: null, t0: null, compare: null };
+    S.i++;
+    renderPlayMode();
+    if (!first) playMode();
+  }
+
+  /** Joue la question dans le mode `m` (le mode de la question, ou le voisin pour comparer). */
+  function scheduleModePass(at, beat, m) {
+    const s = S.set, q = S.q, sc = m.notes, t = S.t, rel = releaseTime();
+    const semi = (i) => sc[M.mod(i, 7)] + 12 * Math.floor(i / 7);
+    const chords = q.roots.map((d) => ({ name: modalRoman(sc, d), pcs: M.triad(sc, d).pcs }));
+    const voiced = M.voiceProgression(t, chords);
+    if (s.tonic === 'drone') for (let b = 0; b < q.roots.length; b += 2) { Piano.note(t - 12, at + 4 * b * beat, 8 * beat * 0.99, 0.32, 0.3); Piano.note(t - 24 + 12 * (t < 60 ? 1 : 0), at + 4 * b * beat, 8 * beat * 0.99, 0.22, 0.3); }
+    if (s.context === 'chords' || s.context === 'both') voiced.forEach((v, k) => { const t0 = at + 4 * k * beat; Piano.note(v.bass, t0, 4 * beat * 0.97, 0.36, rel); v.upper.forEach((x) => Piano.note(x, t0, 4 * beat * 0.97, 0.24, rel)); });
+    if (s.context === 'band') bandPass(voiced, at, beat, s.groove);
+    if (s.context !== 'chords') q.mel.forEach((n) => Piano.note(t + semi(n.idx), at + n.beat * beat, n.dur * beat * 0.93, 0.78, 0.15));
+  }
+
+  function playMode(replay = false, compareWith = null) {
+    const s = S.set, q = S.q;
+    tonicStop();
+    if (replay && !q.answered) q.helped = true;
+    const beat = 60 / s.bpm, passDur = (4 * q.roots.length + 1) * beat;
+    let at = Piano.ctx.currentTime + 0.15;
+    const ms = compareWith ? [q.mode, compareWith] : [q.mode];
+    if (!q.answered && s.tonic === 'first') {   // l'accord de tonique avant la musique
+      const v = M.voiceProgression(S.t, [{ name: 'I', pcs: M.triad(q.mode.notes, 0).pcs }])[0];
+      Piano.note(v.bass, at, 2 * beat, 0.45, 0.3); v.upper.forEach((x) => Piano.note(x, at, 2 * beat, 0.32, 0.3));
+      at += 3 * beat;
+    }
+    const passes = compareWith ? 2 : q.answered ? 1 : s.listen === 'loop' ? Infinity : s.listen === 'twice' ? 2 : 1;
+    Object.assign(q, { endAt: passes === Infinity ? Infinity : at + passes * passDur, compare: compareWith ? compareWith.id : null });
+    if (!q.answered && q.t0 == null) q.t0 = performance.now();
+    q.phase = q.answered ? 'answered' : 'playing';
+    let done = 0, nextAt = at;
+    const pump = () => { while (S && S.q === q && done < passes && nextAt < Piano.ctx.currentTime + 0.8) { scheduleModePass(nextAt, beat, ms[done % ms.length]); done++; nextAt += passDur; } };
+    pump(); TON.pump = setInterval(pump, 120);
+    renderPlayMode();
+  }
+
+  function answerMode(id) {
+    const q = S.q; if (q.answered || q.phase === 'ready') return;
+    q.answered = true; q.picked = id; q.correct = id === q.mode.id; q.secs = (performance.now() - (q.t0 || performance.now())) / 1000;
+    if (q.correct && !q.helped) { S.firstTry++; S.times.push(q.secs); }
+    if (!q.correct) S.missed[q.mode.short] = (S.missed[q.mode.short] || 0) + 1;
+    tonicStop();
+    renderPlayMode();
+  }
+
+  function renderPlayMode() {
+    const s = S.set, q = S.q, m = q.mode;
+    const head = `
+      <header class="top">
+        <button class="link-btn" data-act="home">‹ Quitter</button>
+        <span class="eyebrow">Question ${S.i} / ${S.n}</span>
+        <span class="score">${S.firstTry} ✓</span>
+      </header>
+      <div class="progress"><i style="width:${((S.i - 1) / S.n) * 100}%"></i></div>`;
+    const scaleRow = (mm, other) => `<div class="mode-scale">${mm.notes.map((n, i) => `<span class="${mm.char.includes(i) ? 'char' : ''}${other && other.notes[i] !== n ? ' diff' : ''}">${degLabel(mm.notes, i)}</span>`).join('')}</div>`;
+    if (q.answered) {
+      const near = modeById(m.near), pickedM = modeById(q.picked);
+      const cmp = !q.correct && pickedM ? pickedM : near;
+      $app.innerHTML = head + `
+        <div class="stage"><span class="eyebrow">C'était</span><span class="key">${esc(m.name)}</span>
+          <p class="status ${q.correct ? 'good' : 'bad'}">${q.correct ? `✓ Trouvé${q.helped ? ' (avec réécoute)' : ''} en ${q.secs.toFixed(1).replace('.', ',')} s` : `✗ Tu as choisi : ${esc(pickedM.name)}.`}</p></div>
+        <div class="panel mode-res">
+          <div><span class="eyebrow">${esc(m.short)} · tonique ${esc(M.noteName(S.keyPc, 'major'))}</span>${scaleRow(m)}
+            <span class="hint">${m.char.length ? 'En couleur : la note caractéristique.' : 'La gamme de référence.'} Accords : ${q.roots.map((d) => esc(modalRoman(m.notes, d))).join(' – ')}</span></div>
+          <div><span class="eyebrow">À comparer : ${esc(cmp.short)}</span>${scaleRow(cmp, m)}<span class="hint">Soulignées : les notes qui changent.</span></div>
+        </div>
+        <div class="controls">
+          <button class="ctl" data-act="mode-replay">${ICON.note}Réécouter</button>
+          <button class="ctl" data-act="mode-compare" data-v="${cmp.id}">${ICON.cadence}${esc(m.short)} puis ${esc(cmp.short)}</button>
+        </div>
+        <div class="actions"><button class="btn secondary" data-act="home">Quitter</button><button class="btn" data-act="mode-next">${S.i >= S.n ? 'Voir le bilan' : 'Question suivante'}</button></div>`;
+      return;
+    }
+    const playing = q.phase === 'playing' && Piano.ctx.currentTime < q.endAt;
+    $app.innerHTML = head + `
+      <div class="stage"><span class="eyebrow">Trouver le mode · ${{ melody: 'mélodie', chords: 'accords', both: 'mélodie + accords', band: 'groupe' }[s.context]}</span>
+        <span class="key">?</span>
+        <p class="status">${q.phase === 'ready' ? 'Écoute, puis choisis le mode.' : 'Quel est le mode ?'}</p></div>
+      <div class="mode-answers">${s.pool.map((id) => { const mm = modeById(id); return `<button class="mode-ans" data-act="mode-answer" data-v="${id}" ${q.phase === 'ready' ? 'disabled' : ''}><b>${esc(mm.short)}</b></button>`; }).join('')}</div>
+      <div class="actions">${q.phase === 'ready' ? '<button class="btn wide" data-act="mode-play" style="grid-column:1/-1">Écouter</button>'
+        : s.listen !== 'loop' ? `<button class="btn secondary" data-act="mode-again" style="grid-column:1/-1">Réécouter</button>` : ''}</div>`;
+  }
+
   function renderSetupImprov() {
     const { ex, settings: s } = draft;
     $app.innerHTML = `
@@ -4524,6 +4739,14 @@ const Piano = (() => {
       case 'mic-test': micTestStart(); break;
       case 'loop-go': S.played = true; startLoop(); break;
       case 'tgt-go': startTargets(); break;
+      case 'mode-toggle': { const p2 = draft.settings.pool || []; draft.settings.pool = p2.includes(v) ? p2.filter((x) => x !== v) : [...p2, v]; persistDraft(); renderSetup(); break; }
+      case 'mode-preset': { const pr = MODE_PRESETS.find((x) => x[0] === v); if (pr) { draft.settings.pool = [...pr[2]]; persistDraft(); renderSetup(); } break; }
+      case 'mode-play': playMode(); break;
+      case 'mode-again': playMode(true); break;
+      case 'mode-replay': playMode(); break;
+      case 'mode-compare': playMode(false, modeById(v)); break;
+      case 'mode-answer': answerMode(v); break;
+      case 'mode-next': tonicStop(); if (S.i >= S.n) finish(); else nextModeQuestion(false); break;
       case 'tonic-play': playTonic(); break;
       case 'tonic-again': playTonic(S.set.listen !== 'loop'); break;   // réécouter (une/deux fois) = aide ; relancer la boucle = libre
       case 'tonic-stop': if (S.q) { tonicStop(); S.q.endAt = Piano.ctx.currentTime; renderPlayTonic(); } break;
