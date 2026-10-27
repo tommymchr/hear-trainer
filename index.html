@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <title>Hear-Trainer</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Figtree:wght@400;600;700&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600..800&family=Figtree:wght@400;600;700&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout : une colonne pensée pour une main sur téléphone — barre du haut, scène (tonalité + consigne), touches de réponse façon clavier, commandes en bas. */
 :root {
@@ -1436,6 +1436,14 @@ const Pitch = (() => {
       }
     }
     if (tau < 0) return null;
+    // Erreur d'octave : si la fondamentale est faible (guitare grave), le creux à la moitié de la période (l'octave du dessus)
+    // passe sous le seuil avant le vrai. Si le creux au double de la période est nettement plus profond, c'est lui la note.
+    for (let k = 0; k < 2; k++) {
+      const lo = 2 * tau - 3, hi = Math.min(maxTau, 2 * tau + 3);
+      if (lo > maxTau) break;
+      let t2 = -1; for (let t = Math.max(lo, minTau); t <= hi; t++) if (t2 < 0 || c[t] < c[t2]) t2 = t;
+      if (t2 > 0 && c[tau] > 0.02 && c[t2] < c[tau] * 0.5 && sr / t2 < 400) tau = t2; else break;
+    }
     const x0 = c[tau - 1], x1 = c[tau], x2 = c[tau + 1];
     const den = x0 + x2 - 2 * x1;
     const shift = den ? (x0 - x2) / (2 * den) : 0;
@@ -1578,7 +1586,7 @@ const Piano = (() => {
   const ALL7 = [0, 1, 2, 3, 4, 5, 6];
   const CHORD_BUILTIN = [
     // v1.27 : Accords Majeur, Mineur et personnalisés réunis (id 'ch-custom' conservé pour l'historique).
-    { id: 'quality', type: 'quality', glyph: '◐', title: 'Couleur d\'accord', sub: 'Un accord sonne : majeur ou mineur ? maj7, 7 ou m7 ? Reconnais sa couleur, sans chercher le degré' },
+    { id: 'quality', type: 'quality', glyph: 'Δ', title: 'Couleur d\'accord', sub: 'Un accord sonne : majeur ou mineur ? maj7, 7 ou m7 ? Reconnais sa couleur, sans chercher le degré' },
     { id: 'ch-custom', type: 'chords', glyph: 'V', title: 'Accords', sub: 'Cadence ou bourdon, puis un ou plusieurs accords : reconnais leur degré (toutes les gammes)', scale: 'major', degrees: ALL7, custom: true },
   ];
   const IMPROV_DEFAULTS = {
@@ -2324,7 +2332,7 @@ const Piano = (() => {
     else if (k === 'scale') draft.scale = v;
     else if (k === 'mode' && draft.ex.type === 'instrument') s.mode = v;
     else if (k === 'octaves' || k === 'questions' || k === 'seqLength' || k === 'hold' || k === 'seqLen' || k === 'bars' || k === 'bpc' || k === 'bpm' || k === 'keyPc' || k === 'rounds' || k === 'choices' || k === 'every' || k === 'startRank' || k === 'echoLen' || k === 'chainEvery' || k === 'size' || (k === 'length' && (draft.ex.type === 'contour' || draft.ex.type === 'groove'))) s[k] = Number(v);
-    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones' || k === 'metro' || k === 'strict' || k === 'mic' || k === 'check' || k === 'fifth' || k === 'gap' || k === 'hearNext' || k === 'sev') s[k] = v === 'true';
+    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones' || k === 'metro' || k === 'strict' || k === 'mic' || k === 'check' || k === 'fifth' || k === 'gap' || k === 'hearNext' || k === 'sev' || k === 'once') s[k] = v === 'true';
     else if (k === 'count') s[k] = v === 'auto' ? 'auto' : Number(v);
     else s[k] = v;
     persistDraft(); renderSetup();
@@ -2675,7 +2683,8 @@ const Piano = (() => {
     const { ex, settings: s } = draft;
     const editable = ex.custom || ex.saved;
     const triads = M.scaleTriads(M.SCALES[draft.scale].notes);
-    const commonOk = s.seqLength < 2 || M.commonProgressions(s.seqLength, draft.degrees).length > 0;
+    const commonOk = s.seqLength < 2 || M.commonProgressions(s.seqLength, draft.degrees.filter((x) => typeof x === 'number')).length > 0
+      || ((XPROGS[cvMode(draft.scale)] || {})[s.seqLength] || []).some((p) => p.every((c) => draft.degrees.includes(c)));
     const cad = cadName(M.SCALES[draft.scale].notes, cadDegrees(s));
     $app.innerHTML = `
       <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
@@ -2685,7 +2694,7 @@ const Piano = (() => {
           ${scaleSeg('scale', draft.scale)}
           <p class="hint">Cadence jouée : ${cad}</p></div>
         <div class="setting"><span class="lbl">Accords de l'exercice</span>
-          <div class="seg"><button data-act="all-degrees">Les 7</button></div>
+          <div class="seg"><button data-act="all-degrees">Les 7</button><button data-act="deg-preset" data-v="borrow">+ emprunts</button><button data-act="deg-preset" data-v="dom">+ dominantes</button></div>
           ${(() => { const sc = M.SCALES[draft.scale].notes, sk = draft.scale, b = (c) => { const k = chordOf(c, s.sev, sc); return `<button class="deg${k.x ? ' x' : ''}" style="--c:var(--deg${k.d})" data-act="toggle-degree" data-v="${c}" aria-pressed="${draft.degrees.includes(c)}">${esc(k.name)}</button>`; };
             const fold = (id, l, xs) => (xs.length ? `<button class="more-btn" data-act="cv-fold" data-v="${id}" aria-expanded="${!!ML[id] || draft.degrees.some((d) => xs.includes(d))}">${l} ${ML[id] ? '▴' : '▾'}</button>${ML[id] || draft.degrees.some((d) => xs.includes(d)) ? `<div class="notes12 chords7">${xs.map(b).join('')}</div>` : ''}` : '');
             return `<div class="notes12 chords7">${[0, 1, 2, 3, 4, 5, 6].map(b).join('')}</div>${fold('borrow', 'Emprunts', cvBorrow(sk).map((x) => x[0]))}${fold('dom', 'Dominantes', cvDomRow(sk, s.sev))}`; })()}
@@ -2768,7 +2777,12 @@ const Piano = (() => {
       S.keyPc = M.pickKey(S.set.tonalite, S.keyPc); keyChanged = true;
     }
     S.t = M.tonicMidi(S.keyPc);
-    const seq = S.set.seqLength > 4 ? longSequence(S.set.seqLength, S.degrees, S.set.seqKind, S.prevSeq) : M.pickSequence(S.set.seqLength, S.degrees, S.set.seqKind, S.prevSeq);
+    let seq = S.set.seqLength > 4 ? longSequence(S.set.seqLength, S.degrees, S.set.seqKind, S.prevSeq) : M.pickSequence(S.set.seqLength, S.degrees, S.set.seqKind, S.prevSeq);
+    if (S.set.seqKind === 'common' && S.set.seqLength >= 2 && S.set.seqLength <= 4) {   // emprunts / dominantes choisis : surtout des enchaînements qui les utilisent
+      const { plain, withX } = chordProgs(S.set.seqLength, S.degrees), pool = withX.length && (Math.random() < 0.7 || !plain.length) ? withX : plain;
+      const ok = pool.filter((p) => !S.prevSeq || p.join() !== S.prevSeq.join());
+      if (ok.length) seq = [...ok[Math.floor(Math.random() * ok.length)]];
+    }
     S.prevSeq = seq; S.lastStatus = null;
     S.q = {
       seq, voiced: voiceChords(S.t, seq.map((d) => chordOf(d))),
@@ -2785,6 +2799,21 @@ const Piano = (() => {
   const chordCadenceMode = (s) => (s.ref === 'drone' ? 'none' : null) || s.cadenceMode || (s.cadenceEach === false ? 'keychange' : 'each');
   const CHG = { pump: 0 };
   function chordGridStop() { loopBarClear(); clearInterval(CHG.pump); CHG.pump = 0; TON.drums.forEach((n) => { try { n.stop(); } catch (e) {} }); TON.drums = []; }
+  /** Enchaînements courants avec emprunts et dominantes (accords hors gamme écrits « r,q »). */
+  const XPROGS = {
+    major: { 2: [['10,maj', 0], ['5,min', 0], ['2,7', 4], ['9,7', 1], ['4,7', 5], ['0,7', 3], ['8,maj', 0]],
+      3: [[0, '10,maj', 0], [3, '5,min', 0], ['2,7', 4, 0], ['9,7', 1, 4], ['8,maj', '10,maj', 0], [0, '4,7', 5], [0, '0,7', 3]],
+      4: [[0, '10,maj', 3, 0], [0, 3, '5,min', 0], [0, '2,7', 4, 0], [0, '9,7', 1, 4], [0, '8,maj', '10,maj', 0], [0, '4,7', 5, 3], [0, '0,7', 3, '5,min'], [0, 5, '2,7', 4], [0, '3,maj', 3, 0]] },
+    minor: { 2: [['5,maj', 0], ['7,maj', 0], ['7,7', 0], ['0,7', 3]],
+      3: [[0, '5,maj', 0], [3, '7,7', 0], ['1,maj', '7,7', 0], [0, '0,7', 3]],
+      4: [[0, '5,maj', 0, '5,maj'], [0, 3, '7,7', 0], [0, '1,maj', '7,7', 0], [0, 6, 5, '7,7'], [0, '0,7', 3, '7,7'], [0, 5, '7,maj', 0]] },
+  };
+  /** Progressions possibles avec les accords choisis : celles de la gamme, plus celles qui utilisent les emprunts / dominantes choisis (préférées). */
+  function chordProgs(len, pool) {
+    const nums = pool.filter((x) => typeof x === 'number'), x = (XPROGS[cvMode(S ? S.scaleKey : 'major')] || XPROGS.major)[len] || [];
+    const withX = x.filter((p) => p.every((c) => pool.includes(c)));
+    return { plain: M.commonProgressions(len, nums), withX };
+  }
   /** Suite de 6 ou 8 accords « courante » : construite à partir des progressions de 4 (et 2) accords. */
   function longSequence(len, degrees, kind, prev) {
     const p4 = M.commonProgressions(4, degrees), p2 = M.commonProgressions(2, degrees);
@@ -3060,7 +3089,8 @@ const Piano = (() => {
           <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
       </div>
       <p class="hint">Le micro ne fonctionne pas dans la page épinglée de Claude : ouvre « Ouvrir Hear-Trainer.html » sur ton Mac (de préférence dans Chrome), ou la version installée sur ton téléphone.</p>
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
 
   /* --- Micro --- */
@@ -3327,6 +3357,8 @@ const Piano = (() => {
           ${seg('count', [['auto', 'Selon le niveau'], [2, '2'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [7, '7'], [8, '8']], s.count)}</div>`}
         <div class="setting"><span class="lbl">Tempo</span>
           ${seg('tempo', [['slow', 'Lent'], ['medium', 'Moyen'], ['fast', 'Rapide']], s.tempo)}</div>
+        <div class="setting"><span class="lbl">Écoute</span>${seg('once', [['false', 'Réécoute libre'], ['true', 'Une seule écoute']], !!s.once)}
+          ${s.once ? '<p class="hint">La mélodie n\'est jouée qu\'une fois : retiens-la, comme quand on joue avec d\'autres. La cadence reste disponible ; tout se réécoute une fois la réponse trouvée.</p>' : ''}</div>
         ${s.answerMode === 'instrument' ? `
         <div class="setting"><span class="lbl">Instrument</span>
           ${seg('instrument', [['guitar', 'Guitare classique'], ['melodica', 'Mélodica']], s.instrument)}
@@ -3363,14 +3395,15 @@ const Piano = (() => {
           ${seg('help', [['true', 'Disponible'], ['false', 'Désactivé']], s.help)}
           <p class="hint">Utiliser le clavier pendant une question la compte comme ratée.</p></div>
       </div>
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
 
   async function startMelodySession() {
     const s = { ...draft.settings };
     const scaleNotes = M.SCALES[s.scale].notes;   // gammes à 5 notes : les boutons ; les accords et la cadence viennent de la gamme parent
     S = {
-      type: 'melody', dispScale: s.scale, title: (s.answerMode === 'instrument' ? 'Dictée à l\'instrument · ' : 'Dictée · ') + (s.form === 'period' ? 'question-réponse · ' : '') + M.SCALES[s.scale].name.toLowerCase(),
+      type: 'melody', dispScale: s.scale, title: (s.answerMode === 'instrument' ? 'Dictée à l\'instrument · ' : 'Dictée · ') + (s.once ? 'une écoute · ' : '') + (s.form === 'period' ? 'question-réponse · ' : '') + M.SCALES[s.scale].name.toLowerCase(),
       set: s, mode: M.SCALES[s.scale].mode, resScale: M.harmonyOf(s.scale), notes: scaleNotes,
       n: Math.max(1, Math.min(200, s.questions || 10)),
       i: 0, firstTry: 0, missed: {}, token: 0, keyPc: null, kbdOpen: false,
@@ -3410,6 +3443,7 @@ const Piano = (() => {
   }
 
   /** Événements sonores de la mélodie (à partir de la note `from`), avec les accords cachés si `acc`. */
+  const melLocked = () => !!(S && S.set.once && S.q && !S.q.solved);   // « une seule écoute » : pas de réécoute avant la réponse
   /** Partie en cours (question-réponse) : tant que la question n'est pas écrite, on n'entend qu'elle. */
   const melEnd = () => (S.q.split && S.q.pos < S.q.split && !S.q.solved ? S.q.split : S.q.mel.notes.length);
   function melodyEvents(from = 0, startAt = 0, acc = false, to = S.q.mel.notes.length) {
@@ -3578,9 +3612,9 @@ const Piano = (() => {
         `<button class="ans${M.isAltered(n) ? ' alt' : ''}" data-act="answer-mel" data-v="${n}">${esc(n === 6 && s.scale === 'blues' && s.notation !== 'solfege' ? '♭5' : M.label(n, s.notation))}</button>`).join('')}</div>`}
       <div class="controls">
         <button class="ctl" data-act="replay-cadence">${ICON.cadence}Cadence</button>
-        <button class="ctl" data-act="mel-replay">${ICON.note}${q.split ? (q.pos < q.split && !q.solved ? 'Question' : 'Les deux') : 'Mélodie'}</button>
-        ${q.split && (q.pos >= q.split || q.solved) ? `<button class="ctl" data-act="mel-answer">${ICON.note}Réponse</button>` : ''}
-        <button class="ctl" data-act="mel-from" ${q.pos === 0 || q.solved ? 'disabled' : ''}>${ICON.skip}Depuis ici</button>
+        <button class="ctl" data-act="mel-replay" ${melLocked() ? 'disabled' : ''}>${ICON.note}${q.split ? (q.pos < q.split && !q.solved ? 'Question' : 'Les deux') : 'Mélodie'}</button>
+        ${q.split && (q.pos >= q.split || q.solved) ? `<button class="ctl" data-act="mel-answer" ${melLocked() ? 'disabled' : ''}>${ICON.note}Réponse</button>` : ''}
+        <button class="ctl" data-act="mel-from" ${q.pos === 0 || q.solved || melLocked() ? 'disabled' : ''}>${ICON.skip}Depuis ici</button>
         ${melMic() && !q.solved ? `<button class="ctl" data-act="mel-reveal">${ICON.kbd}Voir la note</button><button class="ctl" data-act="mel-skip">${ICON.skip}Passer</button>` : ''}
         ${(s.help && !melMic()) || q.solved ? `<button class="ctl" data-act="mel-kbd" aria-pressed="${S.kbdOpen}">${ICON.kbd}Clavier</button>` : ''}
       </div>
@@ -3975,6 +4009,7 @@ const Piano = (() => {
   /* ----- Ma boucle : grille d'accords personnalisée (4 à 16 mesures), gardée d'une fois à l'autre ----- */
   const ML_FAV = ['Classique', 'Années 50', 'Pop', 'Jazz'];
   const ML = { sel: 0, half: 0, split: false, more: false };   // état de l'éditeur (pas enregistré)
+  const myLoopEmpty = (s) => !!draft && ['loop', 'targets'].includes(draft.ex.type) && s.loop === 'custom' && !myLoop().cells.slice(0, myLoop().len).some((c) => c && c.length);
   const myLoop = () => { const m = Store.get('myLoop', null); return m && Array.isArray(m.cells) ? m : { len: 8, cells: Array(8).fill(null) }; };
   const myLoopSave = (m) => Store.set('myLoop', m);
   /** Accords joués : une case vide reprend l'accord d'avant (I au tout début). */
@@ -4027,14 +4062,28 @@ const Piano = (() => {
     lydian: [{ id: 'lydream', name: 'Rêveur', A: [0, 1, 0, 1], B: [4, 1, 0, 0] }, { id: 'lypop', name: 'Lydien pop', A: [0, 1, 5, 4], B: [3, 1, 0, 0] }],
     phrygdom: [{ id: 'pdori', name: 'Oriental', A: [0, 1, 0, 1], B: [3, 1, 0, 0] }, { id: 'pdfla', name: 'Flamenco majeur', A: [5, 6, 1, 0], B: [3, 1, 0, 0] }],
     hungarian: [{ id: 'hung', name: 'Tzigane', A: [0, 3, 0, 4], B: [5, 4, 0, 0] }],
+    dblharm: [{ id: 'dh1', name: 'Byzantin', A: [0, 1, 0, 1], B: [3, 1, 0, 0] }, { id: 'dh2', name: 'Danse orientale', A: [0, 3, 1, 0], B: [1, 1, 3, 0] }],
+    // Blues : grilles de 12 mesures et leurs « ponts » (I7, IV7, V7 ; mineur : i7, iv7, ♭VI7, V7)
+    blues: [
+      { id: 'b12', name: 'Blues + pont', A: ['0,7', '0,7', '0,7', '0,7', '5,7', '5,7', '0,7', '0,7', '7,7', '5,7', '0,7', '7,7'], B: ['5,7', '5,7', '0,7', '0,7', '5,7', '5,7', '7,7', '7,7'] },
+      { id: 'bqc', name: 'Quick change + blues 8 mesures', A: ['0,7', '5,7', '0,7', '0,7', '5,7', '5,7', '0,7', '0,7', '7,7', '5,7', '0,7', '7,7'], B: ['0,7', '7,7', '5,7', '5,7', '0,7', '7,7', '0,7', '7,7'] },
+      { id: 'bmin', name: 'Blues mineur + pont', minor: true, A: ['0,m7', '0,m7', '0,m7', '0,m7', '5,m7', '5,m7', '0,m7', '0,m7', '8,7', '7,7', '0,m7', '7,7'], B: ['5,m7', '5,m7', '0,m7', '0,m7', '8,7', '7,7', '0,m7', '0,m7'] },
+    ],
   };
-  const songsFor = (k) => { const sc = M.SCALES[k]; if (!sc || sc.penta) return []; if (sc.modal) return SONGS[k] || []; return SONGS[sc.mode === 'minor' ? 'minor' : 'major'] || []; };
+  const songsFor = (k) => {
+    const sc = M.SCALES[k]; if (!sc) return [];
+    if (k === 'blues') return SONGS.blues;
+    if (k === 'bluesMaj') return SONGS.blues.filter((g) => !g.minor);
+    if (sc.penta) return sc.parent ? songsFor(sc.parent) : [];   // pentatoniques : les morceaux de la gamme parente (on improvise par-dessus)
+    if (sc.modal) return SONGS[k] || [];
+    return SONGS[sc.mode === 'minor' ? 'minor' : 'major'] || [];
+  };
   const songLoops = (g) => ({ ...g, a: { name: `${g.name} · couplet`, chords: g.A, song: g.id }, b: { name: `${g.name} · refrain`, chords: g.B, song: g.id } });
   /** Enchaîner : changer de boucle tous les N tours (au hasard, ou couplet / refrain). */
   function chainPicker(s, list) {
     const ch = s.chain || 'none', every = Number(s.chainEvery) || 4, songs = songsFor(s.scale), sc = M.harmonyOf(s.scale);
     const song = songs.length ? s.song || 'random' : 'pair', form = s.chainForm || 'AB';
-    const rom = (ds) => ds.map((d) => cvChord(sc, d).name).join('–');
+    const rom = (ds) => { const n = ds.map((d) => cvChord(sc, d).name), out = []; n.forEach((x) => { const l = out[out.length - 1]; if (l && l[0] === x) l[1]++; else out.push([x, 1]); }); return out.map(([x, k]) => (k > 1 ? `${x}×${k}` : x)).join('–'); };   // I7×4–IV7×2…
     const names = [...(s.loop === 'custom' ? [] : [['custom', 'Ma boucle']]), ...list.map((l) => [l.name, l.name])].filter(([v]) => v !== s.loop);
     const B = s.chainB && names.some(([v]) => v === s.chainB) ? s.chainB : null;
     const sb = (v, t, sub) => `<button data-act="set" data-k="song" data-v="${esc(v)}" aria-pressed="${song === v}"><b>${esc(t)}</b><span>${esc(sub)}</span></button>`;
@@ -4050,7 +4099,8 @@ const Piano = (() => {
   function cvPalette(sc, sk, act, st) {
     const sev = !!st.sev, row = (items) => `<div class="notes12 chords7">${items.map((c) => { const k = cvChord(sc, c); return `<button class="deg${k.x ? ' x' : ''}" style="--c:var(--deg${k.d})" data-act="${act}" data-v="${c}">${esc(k.name)}</button>`; }).join('')}</div>`;
     const fold = (id, label, items) => `<button class="more-btn" data-act="cv-fold" data-v="${id}" aria-expanded="${!!st[id]}">${label} ${st[id] ? '▴' : '▾'}</button>${st[id] ? row(items) : ''}`;
-    return `<div class="cv-pal"><div class="seg cv-sev">${[['0', '3 sons'], ['1', '4 sons (7e)']].map(([v, l]) => `<button data-act="cv-sev" data-v="${v}" aria-pressed="${String(sev ? 1 : 0) === v}">${l}</button>`).join('')}</div>
+    const blues = sk === 'blues' || sk === 'bluesMaj' ? `<span class="lbl">Blues</span>${row(sk === 'blues' ? ['0,m7', '5,m7', '8,7', '7,7', '0,7', '5,7'] : ['0,7', '5,7', '7,7'])}` : '';
+    return `<div class="cv-pal">${blues}<div class="seg cv-sev">${[['0', '3 sons'], ['1', '4 sons (7e)']].map(([v, l]) => `<button data-act="cv-sev" data-v="${v}" aria-pressed="${String(sev ? 1 : 0) === v}">${l}</button>`).join('')}</div>
       ${row([0, 1, 2, 3, 4, 5, 6].map((d) => (sev ? 's:' + d : d)))}
       ${fold('borrow', 'Emprunts', cvBorrow(sk).map((x) => (sev ? cvSev(x[0]) : cvTri(x[0]))))}
       ${fold('dom', 'Dominantes', cvDomRow(sk, sev).map((c) => (sev ? cvSev(c) : cvTri(c))))}</div>`;
@@ -4177,7 +4227,8 @@ const Piano = (() => {
           ${seg('tones', [['show', 'Affichées'], ['quiz', 'À retrouver']], s.tones)}
           <p class="hint">${s.tones === 'quiz' ? 'Les notes sont cachées : retrouve-les de tête, puis touche l\'accord pour vérifier.' : 'Les notes de l\'accord en cours, en degrés par rapport à la tonique (ex. ii = 2 – 4 – 6).'}</p></div>
       </div>
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
 
   async function startLoopSession() {
@@ -4526,7 +4577,8 @@ const Piano = (() => {
           ${drumsOn(s) ? '<p class="hint">Coupé tant que la batterie joue.</p>' : ''}</div>
       </div>
       ${s.mic ? '<p class="hint">Le micro ne fonctionne pas dans la page épinglée de Claude : ouvre « Ouvrir Hear-Trainer.html » sur ton Mac, ou l\'app installée sur ton téléphone.</p>' : ''}
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
 
   async function startTargetSession() {
@@ -4768,7 +4820,8 @@ const Piano = (() => {
           <div class="row-gap">${seg('questions', [5, 10, 20].map((n) => [n, n]), s.questions)}
           <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
       </div>
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
 
   async function startTonicSession() {
@@ -5455,7 +5508,8 @@ const Piano = (() => {
           <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>`}
       </div>
       ${s.input === 'mic' ? '<p class="hint">Le micro ne fonctionne pas dans la page épinglée de Claude : ouvre « Ouvrir Hear-Trainer.html » sur ton Mac, ou l\'app installée sur ton téléphone.</p>' : ''}
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
 
   async function startRhythmSession() {
@@ -5775,7 +5829,8 @@ const Piano = (() => {
         ${rhLatHtml(s.input)}
       </div>
       ${s.input === 'mic' ? '<p class="hint">Le micro ne fonctionne pas dans la page épinglée de Claude : ouvre « Ouvrir Hear-Trainer.html » sur ton Mac, ou l\'app installée sur ton téléphone.</p>' : ''}
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
   async function startGrooveSession() {
     const s = { ...draft.settings, style: 'auto', bpc: 1, metro: false, scale: 'major', loop: 'Pop' };
@@ -6095,7 +6150,8 @@ const Piano = (() => {
           <div class="row-gap">${seg('questions', [5, 10, 20].map((n) => [n, n]), s.questions)}
           <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
       </div>
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
   async function startRecogSession() {
     const s = { ...draft.settings };
@@ -6234,7 +6290,8 @@ const Piano = (() => {
           <div class="row-gap">${seg('questions', [5, 10, 20].map((n) => [n, n]), s.questions)}
           <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
       </div>
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
 
   async function startContourSession() {
@@ -6347,7 +6404,7 @@ const Piano = (() => {
 
   function renderSetupMode() {
     const { ex, settings: s } = draft;
-    const pool = s.pool || [];
+    const pool = s.pool || [], onlyCh = s.context === 'chords', okPool = onlyCh ? pool.filter((id) => !modeById(id).penta) : pool;
     $app.innerHTML = `
       <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
       <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
@@ -6355,8 +6412,8 @@ const Piano = (() => {
       <div class="panel">
         <div class="setting"><span class="lbl">Modes et gammes de l'exercice</span>
           <div class="seg">${MODE_PRESETS.map(([k, l]) => `<button data-act="mode-preset" data-v="${k}">${l}</button>`).join('')}</div>
-          <div class="mode-pick">${MODES.map((m) => `<button data-act="mode-toggle" data-v="${m.id}" aria-pressed="${pool.includes(m.id)}"><b>${esc(m.name)}</b><span>${m.notes.map((n, i) => modeDeg(m, i)).join(' ')}</span></button>`).join('')}</div>
-          <p class="hint">${pool.length < 2 ? 'Choisis au moins 2 modes.' : `${pool.length} modes choisis.`}</p></div>
+          <div class="mode-pick">${MODES.map((m) => `<button data-act="mode-toggle" data-v="${m.id}" aria-pressed="${pool.includes(m.id) && !(onlyCh && m.penta)}" ${onlyCh && m.penta ? 'disabled' : ''}><b>${esc(m.name)}</b><span>${m.notes.map((n, i) => modeDeg(m, i)).join(' ')}</span></button>`).join('')}</div>
+          <p class="hint">${okPool.length < 2 ? 'Choisis au moins 2 modes.' : `${okPool.length} modes choisis.`}${onlyCh && pool.some((id) => modeById(id).penta) ? ' Avec « Des accords » seuls, les gammes à 5 notes et le blues sont mis de côté : leurs accords sont ceux du majeur ou du mineur, on ne pourrait pas les distinguer. Choisis « Une mélodie » ou « Mélodie + accords » pour les entendre.' : ''}</p></div>
         <div class="setting"><span class="lbl">Ce que tu entends</span>
           ${seg('context', [['melody', 'Une mélodie'], ['chords', 'Des accords'], ['both', 'Mélodie + accords'], ['band', 'Un groupe']], s.context)}</div>
         ${s.context === 'band' ? `<div class="setting"><span class="lbl">Style</span>${seg('groove', [['pop', 'Pop'], ['rock', 'Rock'], ['ballad', 'Ballade'], ['bossa', 'Bossa']], s.groove)}</div>` : ''}
@@ -6374,11 +6431,11 @@ const Piano = (() => {
           <div class="row-gap">${seg('questions', [5, 10, 20].map((n) => [n, n]), s.questions)}
           <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
       </div>
-      <button class="btn wide" data-act="start" ${pool.length < 2 ? 'disabled' : ''}>Commencer</button>`;
+      <button class="btn wide" data-act="start" ${okPool.length < 2 ? 'disabled' : ''}>Commencer</button>`;
   }
 
   async function startModeSession() {
-    const s = { ...draft.settings, pool: [...draft.settings.pool] };
+    const s = { ...draft.settings, pool: draft.settings.pool.filter((id) => draft.settings.context !== 'chords' || !modeById(id).penta) };
     S = { type: 'mode', title: 'Trouver le mode', set: s, n: Math.max(1, Math.min(200, s.questions || 10)), i: 0, firstTry: 0, missed: {}, skipped: 0, times: [], token: 0, keyPc: null, prevMode: null };
     screen = 'play'; pushScreen();
     $app.innerHTML = '<div class="loading">Chargement du piano…</div>';
@@ -6593,6 +6650,7 @@ const Piano = (() => {
 
   /** Ce qu'on joue par-dessus le bourdon : notes (demi-tons) ou accords (degrés 0–6 de la gamme). */
   function droneItems(explore) {
+    if (S.over === 'chords' && S.set.scale === 'blues') return BLUES_MAJ.map((c) => droneItem('x' + c));   // le blues : I7, IV7, V7
     if (S.over === 'chords') return S.set.chordDegs.map((d) => (explore && S.sev ? droneItem('xs:' + d) : { kind: 'chord', d, key: 'c' + d }));
     const it = S.set.degs.map((n) => ({ kind: 'note', n, key: 'n' + n }));
     if (explore) it.push({ kind: 'note', n: 12, key: 'n12' });   // la tonique à l'octave (« 1 ↑ ») : pour entendre 7 → 1
@@ -6609,6 +6667,7 @@ const Piano = (() => {
     const tr = droneChord(it), n = tr.pcs.length, nm = tr.name.replace(/[♭♯]/g, '');
     const q = n > 3 ? ({ maj7: 'majeur 7 (maj7)', m7: 'mineur 7', '7': 'de dominante (7)', m7b5: 'demi-diminué (ø7)', dim7: 'diminué 7' }[/maj7/.test(nm) ? 'maj7' : /ø/.test(nm) ? 'm7b5' : /°7/.test(nm) ? 'dim7' : nm[0] === nm[0].toLowerCase() ? 'm7' : '7'])
       : /°/.test(tr.name) ? 'diminué' : /\+/.test(tr.name) ? 'augmenté' : nm === nm.toUpperCase() ? 'majeur' : 'mineur';
+    if (isBluesCh() && BLUES_CH[it.c]) return `accord ${q} · notes ${tr.pcs.map((p) => M.label(p, 'degres')).join(' – ')} · ${BLUES_CH[it.c][0]}`;
     const out = tr.pcs.filter((p) => !S.scale.includes(p)).map((p) => M.label(p, 'degres'));
     const info = it.c != null ? cvInfo(S.set.scale, it.c) : null;
     return `accord ${q}${info ? ' · ' + info[1] : ''} · notes ${tr.pcs.map((p) => M.label(p, 'degres')).join(' – ')}${out.length ? ` · hors gamme : ${out.join(', ')}` : ''}${info ? ' · ' + info[2] : ''}`;
@@ -6616,6 +6675,7 @@ const Piano = (() => {
   /** Accord vers lequel celui-ci tire (bouton « avec résolution »). */
   function droneResolve(it) {
     const sk = S.set.scale, I = 0;
+    if (isBluesCh() && BLUES_CH[it.c]) return cvChord(S.scale, BLUES_CH[it.c][1]);
     if (it.c != null && it.c.startsWith('s:')) it = { d: Number(it.c.slice(2)) };   // 4 sons : même fonction que le degré
     else if (it.c != null) { const info = cvInfo(sk, it.c); if (!info) return null; const to = info[3]; return to == null ? null : typeof to === 'number' ? cvChord(S.scale, to) : cvChord(S.scale, to); }
     const toD = { 4: I, 6: I, 3: I, 1: 4, 5: 1, 2: 5 }[it.d];   // V et vii° → I, IV → I, ii → V, vi → ii, iii → vi
@@ -6634,6 +6694,13 @@ const Piano = (() => {
   const DRONE_SCALES = [['major', 'Majeur'], ['minor', 'Mineur'], ['harmonic', 'Min. harm.'], ['melodic', 'Min. mél.'], ['dorian', 'Dorien'], ['phrygian', 'Phrygien'], ['lydian', 'Lydien'],
     ['mixolydian', 'Mixolydien'], ['phrygdom', 'Phryg. dom.'], ['dblharm', 'Double harm.'], ['hungarian', 'Hongrois'],
     ['pentaMaj', 'Penta maj.'], ['pentaMin', 'Penta min.'], ['blues', 'Blues'], ['bluesMaj', 'Blues maj.'], ['hirajoshi', 'Hirajoshi']];
+  // En accords : seulement les gammes à 7 notes (les gammes à 5 notes n'ont pas d'accords à elles) + le blues, avec ses vrais accords.
+  const droneScaleChips = () => (S.over === 'chords' ? DRONE_SCALES.filter(([k]) => !M.SCALES[k].penta || k === 'blues').map(([k, l]) => [k, k === 'blues' ? 'Blues (I7, IV7, V7)' : l]) : DRONE_SCALES);
+  const PENTA_PARENT = { pentaMaj: 'major', pentaMin: 'minor', hirajoshi: 'minor', bluesMaj: 'blues' };
+  const isBluesCh = () => S.over === 'chords' && S.set.scale === 'blues';
+  const BLUES_CH = { '0,7': ['le I7 : la maison du blues (un accord de 7e, jamais maj7)', '5,7'], '5,7': ['le IV7 : 5e mesure du blues (ou 2e, en « quick change »)', '0,7'], '7,7': ['le V7 : mesure 9, le retour vers la maison', '5,7'],
+    '0,m7': ['i7 : la maison du blues mineur', '5,m7'], '5,m7': ['iv7 : 5e mesure du blues mineur', '0,m7'], '8,7': ['♭VI7 : mesure 9 du blues mineur, il glisse vers V7', '7,7'] };
+  const BLUES_MAJ = ['0,7', '5,7', '7,7'], BLUES_MIN = ['0,m7', '5,m7', '8,7', '7,7'];
   /** Explorer : changer de gamme sans arrêter le bourdon. Les degrés suivent la nouvelle gamme (3 → ♭3…). */
   function droneSetScale(key) {
     if (!M.SCALES[key] || key === S.set.scale) return;
@@ -6658,9 +6725,9 @@ const Piano = (() => {
     $app.innerHTML = `
       <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
       <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
-      <p class="hint">La tonique sonne en continu (bourdon), comme une tanpura ou une cornemuse. Par-dessus, chaque note prend sa couleur : la 3 lumineuse, la ♭3 sombre, la 7 qui veut monter… Pas de questions : touche, écoute, aussi longtemps que tu veux. Pour t'interroger ensuite : Fonctions ou Accords, avec la référence « Bourdon ».</p>
+      <p class="hint">La tonique sonne en continu (bourdon), comme une tanpura ou une cornemuse. ${s.over === 'chords' ? 'Par-dessus, chaque accord prend sa couleur : I le repos, IV la préparation, V la tension… Pendant l\'exercice : les accords à 4 sons, les emprunts et les dominantes. Pas de questions : touche, écoute, aussi longtemps que tu veux. Pour t\'interroger ensuite : Accords ou Couleur d\'accord.' : 'Par-dessus, chaque note prend sa couleur : la 3 lumineuse, la ♭3 sombre, la 7 qui veut monter… Pas de questions : touche, écoute, aussi longtemps que tu veux. Pour t\'interroger ensuite : Fonctions, avec la référence « Bourdon ».'}</p>
       <div class="panel">
-        <div class="setting"><span class="lbl">Gamme</span>${scaleSeg('scale', s.scale, false, true)}</div>
+        <div class="setting"><span class="lbl">Gamme</span>${scaleSeg('scale', s.scale, false, s.over !== 'chords')}${s.over === 'chords' ? '<p class="hint">Pendant l\'exercice, la puce « Blues » montre ses vrais accords : I7, IV7, V7.</p>' : ''}</div>
         ${ex.lock ? '' : `<div class="setting"><span class="lbl">Par-dessus le bourdon</span>
           ${seg('over', [['notes', 'Des notes'], ['chords', 'Des accords']], s.over)}</div>`}
         ${s.over === 'notes' ? `<div class="setting"><span class="lbl">Notes${quiz ? ' de l\'exercice' : ' à explorer'}</span>
@@ -6692,6 +6759,7 @@ const Piano = (() => {
 
   async function startDroneSession() {
     droneAllStop();
+    if (draft.settings.over === 'chords' && PENTA_PARENT[draft.settings.scale]) draft.settings.scale = PENTA_PARENT[draft.settings.scale];
     const s = { ...draft.settings, part: 'explore', degs: [...droneDegs(draft.settings)].sort((a, b) => a - b), chordDegs: [...draft.settings.chordDegs].sort((a, b) => a - b) };
     const sc = M.SCALES[s.scale].notes, quiz = s.part === 'quiz';
     S = { type: 'drone', part: s.part, title: quiz ? 'Bourdon · reconnaître' : draft.ex.title, lock: draft.ex.lock || null, set: s, over: s.over, scale: sc, resScale: sc, dispScale: s.scale, mode: M.SCALES[s.scale].mode,
@@ -6740,12 +6808,13 @@ const Piano = (() => {
       $app.innerHTML = `
         <header class="top"><button class="link-btn" data-act="home">‹ Quitter</button><span class="eyebrow">Explorer · bourdon</span><span></span></header>
         <div class="stage"><span class="eyebrow">Bourdon sur</span><span class="key">${esc(keyTitle())}</span></div>
-        <div class="scale-chips" role="group" aria-label="Gamme">${DRONE_SCALES.map(([k, l]) => `<button data-act="drone-scale" data-v="${k}" aria-pressed="${s.scale === k}">${l}</button>`).join('')}</div>
+        <div class="scale-chips" role="group" aria-label="Gamme">${droneScaleChips().map(([k, l]) => `<button data-act="drone-scale" data-v="${k}" aria-pressed="${s.scale === k}">${l}</button>`).join('')}</div>
         <div class="stage"><p class="status" id="drone-say">${S.last ? droneSay(S.last) : `Touche ${S.over === 'chords' ? 'un accord' : 'un degré'} : écoute sa couleur sur le bourdon.`}</p></div>
         ${S.lock ? '' : `<div class="seg">${[['notes', 'Notes'], ['chords', 'Accords']].map(([v, l]) => `<button data-act="drone-over" data-v="${v}" aria-pressed="${S.over === v}">${l}</button>`).join('')}</div>`}
-        ${S.over === 'chords' ? `<div class="seg cv-sev">${[['0', '3 sons'], ['1', '4 sons (7e)']].map(([v, l]) => `<button data-act="cv-sev" data-v="${v}" aria-pressed="${String(S.sev ? 1 : 0) === v}">${l}</button>`).join('')}</div>` : ''}
+        ${S.over === 'chords' && !isBluesCh() ? `<div class="seg cv-sev">${[['0', '3 sons'], ['1', '4 sons (7e)']].map(([v, l]) => `<button data-act="cv-sev" data-v="${v}" aria-pressed="${String(S.sev ? 1 : 0) === v}">${l}</button>`).join('')}</div>` : ''}
         ${pad(droneItems(true), (it) => 'dp' + (S.last && S.last.key === it.key ? ' sel' : '') + (it.kind === 'note' && !S.scale.includes(it.n % 12) ? ' out' : ''))}
-        ${S.over === 'chords' ? [['borrow', 'Emprunts', cvBorrow(s.scale)], ['dom', 'Dominantes', cvDomRow(s.scale, S.sev).map((c) => [c])]].map(([id, l, xs]) => xs.length ? `<button class="more-btn" data-act="cv-fold" data-v="${id}" aria-expanded="${!!DRN[id]}">${l} ${DRN[id] ? '▴' : '▾'}</button>${DRN[id] ? pad(xs.map(([c]) => droneItem('x' + (S.sev ? cvSev(c) : cvTri(c)))), (it) => 'dp x' + (S.last && S.last.key === it.key ? ' sel' : '')) : ''}` : '').join('') : ''}
+        ${isBluesCh() ? `<button class="more-btn" data-act="cv-fold" data-v="bmin" aria-expanded="${!!DRN.bmin}">Blues mineur ${DRN.bmin ? '▴' : '▾'}</button>${DRN.bmin ? pad(BLUES_MIN.map((c) => droneItem('x' + c)), (it) => 'dp' + (S.last && S.last.key === it.key ? ' sel' : '')) : ''}` : ''}
+        ${S.over === 'chords' && !isBluesCh() ? [['borrow', 'Emprunts', cvBorrow(s.scale)], ['dom', 'Dominantes', cvDomRow(s.scale, S.sev).map((c) => [c])]].map(([id, l, xs]) => xs.length ? `<button class="more-btn" data-act="cv-fold" data-v="${id}" aria-expanded="${!!DRN[id]}">${l} ${DRN[id] ? '▴' : '▾'}</button>${DRN[id] ? pad(xs.map(([c]) => droneItem('x' + (S.sev ? cvSev(c) : cvTri(c)))), (it) => 'dp x' + (S.last && S.last.key === it.key ? ' sel' : '')) : ''}` : '').join('') : ''}
         <div class="controls">
           <button class="ctl" data-act="drone-toggle" aria-pressed="${!!DRN.nodes}">${ICON.note}${DRN.nodes ? 'Bourdon : on' : 'Bourdon : off'}</button>
           <button class="ctl" data-act="drone-fifth" aria-pressed="${!!s.fifth}">${ICON.cadence}${s.fifth ? 'Avec la quinte' : 'Sans la quinte'}</button>
@@ -6842,7 +6911,8 @@ const Piano = (() => {
           <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
       </div>
       <p class="hint">Le micro ne fonctionne pas dans la page épinglée de Claude : ouvre « Ouvrir Hear-Trainer.html » sur ton Mac, ou l'app installée sur ton téléphone.</p>
-      <button class="btn wide" data-act="start">Commencer</button>`;
+      ${myLoopEmpty(draft.settings) ? '<p class="hint" style="text-align:center">Ta grille est vide : touche une mesure, puis un accord.</p>' : ''}
+      <button class="btn wide" data-act="start" ${myLoopEmpty(draft.settings) ? 'disabled' : ''}>Commencer</button>`;
   }
 
   async function startImprovSession() {
@@ -7405,7 +7475,7 @@ const Piano = (() => {
         }
         break;
       }
-      case 'drone-over': S.over = v; S.last = null; renderPlayDrone(); break;
+      case 'drone-over': S.over = v; S.last = null; if (v === 'chords' && PENTA_PARENT[S.set.scale]) droneSetScale(PENTA_PARENT[S.set.scale]); else if (v === 'chords' && M.SCALES[S.set.scale].penta && S.set.scale !== 'blues') droneSetScale('major'); renderPlayDrone(); break;
       case 'drone-toggle': if (DRN.nodes) droneStop(); else droneStart(0.8); renderPlayDrone(); break;
       case 'drone-fifth': S.set.fifth = !S.set.fifth; if (DRN.nodes) droneStart(0.25); renderPlayDrone(); break;
       case 'drone-key': droneNewKey(); renderPlayDrone(); break;
@@ -7497,8 +7567,8 @@ const Piano = (() => {
       }
       case 'sdeg-preset': { const sc = singScaleNotes(draft.settings); draft.settings.degrees = v === 'all' ? sc.map((_, i) => i) : sing135(sc); persistDraft(); renderSetup(); break; }
       case 'answer-mel': answerMelody(Number(v)); break;
-      case 'mel-replay': replayMelody(0); break;
-      case 'mel-answer': replayMelody(S.q.split); break;
+      case 'mel-replay': if (!melLocked()) replayMelody(0); break;
+      case 'mel-answer': if (!melLocked()) replayMelody(S.q.split); break;
       case 'cad-add': { const s = draft.settings; s.cadDeg = [...(s.cadDeg || []), Number(v)].slice(0, 5); renderSetup(); break; }
       case 'cad-undo': draft.settings.cadDeg = (draft.settings.cadDeg || []).slice(0, -1); renderSetup(); break;
       case 'cad-clear': draft.settings.cadDeg = []; renderSetup(); break;
@@ -7508,7 +7578,7 @@ const Piano = (() => {
       case 'cv-fold': if (screen === 'play' && S && S.type === 'drone') { DRN[v] = !DRN[v]; renderPlayDrone(); } else { ML[v] = !ML[v]; renderSetup(); } break;
       case 'drone-res': S.res = !S.res; renderPlayDrone(); break;
       case 'ml-sel': case 'ml-put': case 'ml-split': case 'ml-same': case 'ml-copyrow': case 'ml-clearcell': case 'ml-clear': case 'ml-len': case 'ml-from': case 'ml-hear': myLoopAct(b.dataset.act, v); break;
-      case 'mel-from': replayMelody(S.q.pos); break;
+      case 'mel-from': if (!melLocked()) replayMelody(S.q.pos); break;
       case 'mel-next': Piano.stopAll(); S.kbdOpen = false; nextQuestion(false); break;
       case 'mel-reveal': melReveal(); break;
       case 'mel-skip': melSkip(); break;
@@ -7533,6 +7603,12 @@ const Piano = (() => {
         persistDraft(); renderSetup(); break;
       }
       case 'all-degrees': draft.degrees = [...ALL7]; persistDraft(); renderSetup(); break;
+      case 'deg-preset': {   // les 7 + les emprunts (ou les dominantes) les plus courants, en enchaînements courants
+        const sk = draft.scale, add = v === 'borrow' ? cvBorrow(sk).slice(0, 3).map((x) => x[0]) : cvDomRow(sk, false).slice(0, 3);
+        draft.degrees = [...ALL7, ...add]; ML[v] = true;
+        const s = draft.settings; if (s.seqLength < 2) s.seqLength = 4; s.seqKind = 'common';
+        persistDraft(); renderSetup(); break;
+      }
       case 'replay-cadence': if (S.type === 'instrument') playInstrumentQuestion(true); else { if (S.type === 'chords') { chordGridStop(); if (chordCadenceMode(S.set) === 'none' && S.q && !S.q.solved) S.q.helped = true; } playQuestion(true, true); } break;
       case 'replay-note': replayNote(); break;
       case 'kbd':
@@ -7565,14 +7641,14 @@ const Piano = (() => {
     }
   });
 
-  window.__ht = { get session() { return S; }, processRec, rhHit, rhNotation, seg: (i) => segAt(i), get now() { return Piano.ctx && Piano.ctx.currentTime; } }; // pour les tests automatiques
+  window.__ht = { get session() { return S; }, processRec, rhHit, rhNotation, seg: (i) => segAt(i), open: (id) => openSetup(id), ids: () => allIds(), get now() { return Piano.ctx && Piano.ctx.currentTime; } }; // pour les tests automatiques
   renderHome();
   try { history.replaceState({ s: 'home' }, ''); } catch (e) {}
 })();
 
 </script>
 <script>
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
