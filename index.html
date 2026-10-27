@@ -610,7 +610,7 @@ p { margin: 0; }
 .rh-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 .rh-grid { display: grid; grid-template-columns: repeat(calc(var(--n) * 4), 1fr); gap: 3px; }
 .rh-grid span { height: 26px; border-radius: 5px; background: var(--line); opacity: .55; }
-.rh-grid span.beat { box-shadow: inset 3px 0 0 var(--muted); }
+.rh-grid span.beat:not(:first-child) { margin-left: 7px; }   /* un petit espace entre les temps */
 .rh-grid span.on { background: var(--deg6); opacity: 1; }
 .rh-calib { gap: 14px; }
 .gr-meter { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: .75rem; font-weight: 700; color: var(--muted); }
@@ -621,6 +621,35 @@ p { margin: 0; }
 .gr-stats div { display: flex; flex-direction: column; gap: 2px; }
 .gr-stats b { font-size: 1.05rem; }
 .gr-stats span { color: var(--muted); font-size: .88rem; }
+/* Reconnaître un rythme · notation */
+.rr-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.rr-bar .link-btn { display: inline-flex; align-items: center; gap: 6px; }
+.rr-bar .link-btn svg { width: 18px; height: 18px; }
+.rh-view { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.rh-view button { border: 0; background: var(--surface); color: var(--muted); font-weight: 700; font-size: .8rem; padding: 5px 11px; }
+.rh-view button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.rr-choices { display: flex; flex-direction: column; gap: 10px; }
+.rr-card { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+.rr-pick { display: flex; flex-direction: column; justify-content: center; min-height: 64px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); touch-action: manipulation; }
+.rr-pick:active { transform: translateY(1px); }
+.rr-hear { width: 52px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--deg6); font-size: 1.1rem; }
+.rr-card.ok .rr-pick { border: 2px solid var(--good); background: var(--good-soft); }
+.rr-card.no .rr-pick { border: 2px solid var(--bad); background: var(--bad-soft); }
+.rh-notation { width: 100%; height: auto; max-height: 76px; }
+/* Jouer en place · consigne qui change ; écho */
+.gr-motif { display: grid; gap: 8px; }
+.gr-now, .gr-next { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); }
+.gr-now { border: 2px solid color-mix(in srgb, var(--deg6) 55%, var(--line)); }
+.gr-next { border: 2px dashed var(--accent); background: var(--accent-soft); animation: grpulse 1s ease-in-out infinite alternate; }
+@keyframes grpulse { from { opacity: .75; } to { opacity: 1; } }
+.echo-phase { font-family: var(--font-display); font-size: 2rem; font-weight: 800; min-height: 1.3em; color: var(--muted); margin: 0; }
+.echo-phase.you { color: var(--deg6); }
+.echo-strip { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; min-height: 12px; margin-top: 8px; }
+.echo-strip i { width: 12px; height: 12px; border-radius: 50%; background: var(--line); }
+.echo-strip i.ok { background: var(--good); }
+.echo-strip i.near { background: #e39a2d; }
+.echo-strip i.no { background: var(--bad); }
+.echo-strip.big i { width: 14px; height: 14px; }
 
 </style>
 </head>
@@ -1493,6 +1522,7 @@ const Piano = (() => {
   ];
   const RHY_BUILTIN = [
     { id: 'rh-copy', type: 'rhythm', glyph: '♩♪', title: 'Reproduire un rythme', sub: 'L\'app joue un rythme, tu le refrappes : à l\'écran, avec la barre d\'espace ou au micro (mains, guitare…)' },
+    { id: 'rh-recog', type: 'rrecog', glyph: '♪?', title: 'Reconnaître un rythme', sub: 'Un rythme est joué : retrouve-le parmi 3 ou 4 propositions, en cases ou en notation' },
     { id: 'rh-groove', type: 'groove', glyph: '⏱', title: 'Jouer en place', sub: 'Un groupe joue : tape avec lui (temps, 2 et 4, contretemps…) ; avance, retard, régularité, garde le tempo' },
   ];
   const INST_BUILTIN = [
@@ -1616,7 +1646,7 @@ const Piano = (() => {
   }
   function weakLabel(n) {
     if (S.type === 'chords') return chordLabel(Number(n));
-    if (S.type === 'instrument' || S.type === 'sing' || S.type === 'targets' || S.type === 'tonic' || S.type === 'mode' || S.type === 'drone' || S.type === 'contour' || S.type === 'rhythm' || S.type === 'groove') return String(n);
+    if (S.type === 'instrument' || S.type === 'sing' || S.type === 'targets' || S.type === 'tonic' || S.type === 'mode' || S.type === 'drone' || S.type === 'contour' || S.type === 'rhythm' || S.type === 'groove' || S.type === 'rrecog' || S.type === 'echo') return String(n);
     return M.label(Number(n), (S.set && S.set.notation) || 'degres');
   }
 
@@ -1625,7 +1655,7 @@ const Piano = (() => {
     { id: 'deg', deg: 0, glyph: '1', name: 'Degrés', step: 'Reconnaître les degrés', sub: 'Une note sur la cadence ou le bourdon', ids: ['drone-deg', 'custom', 'tonic'], types: ['notes', 'tonic'] },
     { id: 'acc', deg: 3, glyph: 'IV', name: 'Accords', step: 'Reconnaître les accords', sub: 'Degrés d\'accords et enchaînements', ids: ['drone-acc', 'ch-custom'], types: ['chords'] },
     { id: 'mel', deg: 2, glyph: '♫', name: 'Mélodies', step: 'Retenir une mélodie', sub: 'Dictée, aux boutons ou à l\'instrument', ids: ['contour', 'mel', 'mel-inst'], types: ['melody', 'contour'] },
-    { id: 'rhy', deg: 6, glyph: '♩♪', name: 'Rythme', step: 'Sentir le rythme', sub: 'Reproduire un rythme, jouer en place sur un groove', ids: ['rh-copy', 'rh-groove'], types: ['rhythm', 'groove'] },
+    { id: 'rhy', deg: 6, glyph: '♩♪', name: 'Rythme', step: 'Sentir le rythme', sub: 'Reproduire un rythme, jouer en place sur un groove', ids: ['rh-copy', 'rh-recog', 'rh-groove'], types: ['rhythm', 'rrecog', 'groove'] },
     { id: 'voi', deg: 1, glyph: '♩', name: 'Voix & instrument', step: 'Chanter et jouer', sub: 'Ta voix, ta guitare, ton mélodica', ids: ['sing', 'sing-repeat', 'inst'], types: ['sing', 'instrument'] },
     { id: 'scl', deg: 5, glyph: '♮', name: 'Gammes et modes', step: 'Reconnaître les modes', sub: 'La couleur d\'une gamme : modes et musiques du monde', ids: ['drone', 'modes'], types: ['mode', 'drone'] },
     { id: 'imp', deg: 4, glyph: '⇄', name: 'Improviser', step: 'Improviser', sub: 'Question-réponse en rythme', ids: ['loop', 'targets', 'improv2'], types: ['improv', 'targets'] },
@@ -1767,6 +1797,7 @@ const Piano = (() => {
     tonic: [{ key: 'level', steps: [['easy', 'Facile'], ['medium', 'Moyen'], ['hard', 'Difficile']] },
       { key: 'listen', steps: [['loop', 'écoute en boucle'], ['twice', 'écoute deux fois'], ['once', 'écoute une seule fois']] }],
     rhythm: [{ key: 'level', steps: [['l1', 'noires'], ['l2', '+ croches'], ['l3', '+ silences'], ['l4', '+ syncopes'], ['l5', '+ doubles croches'], ['l6', '+ triolets, swing']] }, { key: 'tol', steps: [['loose', 'précision souple'], ['normal', 'précision normale'], ['strict', 'précision stricte']] }],
+    rrecog: [{ key: 'level', steps: [['l1', 'noires'], ['l2', '+ croches'], ['l3', '+ silences'], ['l4', '+ syncopes'], ['l5', '+ doubles croches'], ['l6', '+ triolets, swing']] }, { key: 'diff', steps: [['easy', 'propositions faciles'], ['hard', 'propositions difficiles']] }],
     contour: [{ key: 'level', steps: [['dir', 'direction seule'], ['size', 'direction + taille']] }, { key: 'length', steps: [[3, '3 notes'], [4, '4 notes'], [6, '6 notes'], [8, '8 notes']] }],
     drone: [{ key: 'octaves', steps: [[1, '1 octave'], [2, '2 octaves']] }],
     targets: [{ key: 'help', steps: [[true, 'avec la note'], [false, 'sans la note']] },
@@ -2002,8 +2033,8 @@ const Piano = (() => {
       screen = 'setup'; pushScreen();
       return renderSetup();
     }
-    if (ex.type === 'rhythm' || ex.type === 'groove') {
-      draft = { ex, settings: { ...(ex.type === 'rhythm' ? RH_DEFAULTS : GR_DEFAULTS), ...Store.get('settings:' + id, {}) } };
+    if (ex.type === 'rhythm' || ex.type === 'groove' || ex.type === 'rrecog') {
+      draft = { ex, settings: { ...(ex.type === 'rhythm' ? RH_DEFAULTS : ex.type === 'rrecog' ? RR_DEFAULTS : GR_DEFAULTS), ...Store.get('settings:' + id, {}) } };
       screen = 'setup'; pushScreen();
       return renderSetup();
     }
@@ -2105,6 +2136,7 @@ const Piano = (() => {
     if (draft.ex.type === 'contour') return renderSetupContour();
     if (draft.ex.type === 'rhythm') return renderSetupRhythm();
     if (draft.ex.type === 'groove') return renderSetupGroove();
+    if (draft.ex.type === 'rrecog') return renderSetupRecog();
     const { ex, settings: s } = draft;
     const editable = ex.custom || ex.saved;
     const presets = [['major', 'Majeur'], ['minor', 'Mineur nat.'], ['harmonic', 'Mineur harm.'], ['melodic', 'Mineur mél.'], ['all', 'Les 12'], ['none', 'Aucune']];
@@ -2172,13 +2204,14 @@ const Piano = (() => {
       persistDraft(); return renderSetup();
     }
     if (k === 'tempo' && draft.ex.type === 'improv') delete s.bpm;   // retour à un tempo de base
-    if (k === 'mode' && draft.ex.type !== 'instrument') draft.mode = v;
+    if (k === 'mode' && (draft.ex.type === 'groove' || draft.ex.type === 'rhythm')) s.mode = v;   // déroulement de l'exercice (consigne qui change, écho)
+    else if (k === 'mode' && draft.ex.type !== 'instrument') draft.mode = v;
     else if (k === 'scale' && draft.ex.type === 'drone') { s.scale = v; s.degs = [...M.SCALES[v].notes]; }
     else if (k === 'scale' && (draft.ex.type === 'melody' || draft.ex.type === 'contour' || draft.ex.type === 'improv' || draft.ex.type === 'loop' || draft.ex.type === 'targets')) s.scale = v;
     else if (k === 'scale') draft.scale = v;
     else if (k === 'mode' && draft.ex.type === 'instrument') s.mode = v;
-    else if (k === 'octaves' || k === 'questions' || k === 'seqLength' || k === 'hold' || k === 'seqLen' || k === 'bars' || k === 'bpc' || k === 'bpm' || k === 'keyPc' || k === 'rounds' || (k === 'length' && (draft.ex.type === 'contour' || draft.ex.type === 'groove'))) s[k] = Number(v);
-    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones' || k === 'metro' || k === 'strict' || k === 'mic' || k === 'check' || k === 'fifth' || k === 'gap') s[k] = v === 'true';
+    else if (k === 'octaves' || k === 'questions' || k === 'seqLength' || k === 'hold' || k === 'seqLen' || k === 'bars' || k === 'bpc' || k === 'bpm' || k === 'keyPc' || k === 'rounds' || k === 'choices' || k === 'every' || k === 'startRank' || k === 'echoLen' || (k === 'length' && (draft.ex.type === 'contour' || draft.ex.type === 'groove'))) s[k] = Number(v);
+    else if (k === 'help' || k === 'cadenceEach' || k === 'octaveExact' || k === 'showKey' || k === 'accomp' || k === 'arrow' || k === 'headphones' || k === 'metro' || k === 'strict' || k === 'mic' || k === 'check' || k === 'fifth' || k === 'gap' || k === 'hearNext') s[k] = v === 'true';
     else if (k === 'count') s[k] = v === 'auto' ? 'auto' : Number(v);
     else s[k] = v;
     persistDraft(); renderSetup();
@@ -2251,8 +2284,9 @@ const Piano = (() => {
     if (draft.ex.type === 'mode') return startModeSession();
     if (draft.ex.type === 'drone') return startDroneSession();
     if (draft.ex.type === 'contour') return startContourSession();
-    if (draft.ex.type === 'rhythm') return startRhythmSession();
+    if (draft.ex.type === 'rhythm') return draft.settings.mode === 'echo' ? startEchoSession() : startRhythmSession();
     if (draft.ex.type === 'groove') return startGrooveSession();
+    if (draft.ex.type === 'rrecog') return startRecogSession();
     const { ex, settings } = draft;
     if (ex.saved) { // garder les derniers réglages de l'exercice enregistré
       const list = savedList(); const i = list.findIndex((e) => e.id === ex.id);
@@ -2456,8 +2490,8 @@ const Piano = (() => {
         ${(S.type === 'instrument' || S.type === 'tonic' || S.type === 'mode' || S.type === 'drone') && S.times.length ? `<p class="muted">Temps moyen pour trouver ${S.type === 'tonic' ? 'la tonique' : S.type === 'mode' ? 'le mode' : S.type === 'drone' && S.over === 'chords' ? 'un accord' : 'une note'} : <b>${(S.times.reduce((a, b) => a + b, 0) / S.times.length).toFixed(1).replace('.', ',')} s</b></p>` : ''}
       </div>
       <div class="panel">
-        <h2>${S.type === 'rhythm' ? 'Tes erreurs les plus fréquentes' : S.type === 'contour' ? 'Mouvements manqués' : S.type === 'drone' ? (S.over === 'chords' ? 'Accords manqués' : 'Notes manquées') : S.type === 'mode' ? 'Modes manqués' : S.type === 'tonic' ? 'Tonalités manquées' : S.type === 'instrument' ? 'Notes révélées' : S.type === 'sing' ? 'Notes écoutées avant de chanter' : 'À retravailler'}</h2>
-        ${weak.length ? `<div class="weak">${weak.map(([n, c]) => `<span>${esc(S.type === 'chords' ? chordLabel(Number(n)) : S.type === 'instrument' || S.type === 'sing' || S.type === 'tonic' || S.type === 'mode' || S.type === 'drone' || S.type === 'contour' || S.type === 'rhythm' ? n : M.label(Number(n), S.set.notation))} — ${c} fois</span>`).join('')}</div>`
+        <h2>${S.type === 'rhythm' || S.type === 'rrecog' ? 'Tes erreurs les plus fréquentes' : S.type === 'contour' ? 'Mouvements manqués' : S.type === 'drone' ? (S.over === 'chords' ? 'Accords manqués' : 'Notes manquées') : S.type === 'mode' ? 'Modes manqués' : S.type === 'tonic' ? 'Tonalités manquées' : S.type === 'instrument' ? 'Notes révélées' : S.type === 'sing' ? 'Notes écoutées avant de chanter' : 'À retravailler'}</h2>
+        ${weak.length ? `<div class="weak">${weak.map(([n, c]) => `<span>${esc(S.type === 'chords' ? chordLabel(Number(n)) : S.type === 'instrument' || S.type === 'sing' || S.type === 'tonic' || S.type === 'mode' || S.type === 'drone' || S.type === 'contour' || S.type === 'rhythm' || S.type === 'rrecog' ? n : M.label(Number(n), S.set.notation))} — ${c} fois</span>`).join('')}</div>`
           : `<p class="muted">${S.type === 'instrument' ? 'Tu as tout trouvé sans aide.' : S.type === 'sing' ? 'Tout chanté sans écouter la note.' : 'Aucune erreur sur cette série.'}</p>`}
       </div>
       ${levelUpHtml()}
@@ -3792,6 +3826,7 @@ const Piano = (() => {
         loopBarSet(from, S.chordDur * L, S.total === Infinity ? Infinity : S.nextAt + (S.total - S.next) * S.chordDur, anchor);
       }
       S.marks.push({ t: S.nextAt, i: S.next, beat: S.beat }); if (S.marks.length > 16) S.marks.shift();
+      if (S.onBar) S.onBar(S.next, S.nextAt);   // Jouer en place : coups attendus de la mesure
       if (!(S.mute && S.mute(S.next))) scheduleLoopChord(S.next % L, S.nextAt, S.beat);   // Jouer en place : mesures sans le groupe
       S.next++; S.nextAt += S.chordDur;
     }
@@ -4565,8 +4600,8 @@ const Piano = (() => {
 
   /* ---------- Rythme : calibrage, Reproduire un rythme, Jouer en place sur un groove ---------- */
   // Temps en « ticks » : 12 par temps (doubles croches = 3, croches = 6, triolets = 4).
-  const RH_DEFAULTS = { level: 'l2', bars: 1, bpm: 80, tol: 'normal', listen: 'once', input: 'tap', metro: true, headphones: false, questions: 10 };
-  const GR_DEFAULTS = { drums: 'pop', bpm: 90, target: 'beats', length: 16, gap: false, input: 'tap', headphones: false };
+  const RH_DEFAULTS = { mode: 'question', level: 'l2', bars: 1, bpm: 80, tol: 'normal', listen: 'once', input: 'tap', metro: true, headphones: false, questions: 10, backing: 'metro', echoLen: 0 };
+  const GR_DEFAULTS = { mode: 'fixed', drums: 'pop', bpm: 90, target: 'beats', length: 16, gap: false, input: 'tap', headphones: false, every: 4, startRank: 0, hearNext: false };
   const RH_TOL = { loose: 0.09, normal: 0.06, strict: 0.035 };   // tolérance (s) pour un coup « en place »
   const RH_LEVELS = [['l1', 'Noires'], ['l2', '+ croches'], ['l3', '+ silences'], ['l4', '+ syncopes'], ['l5', '+ doubles croches'], ['l6', '+ triolets, swing']];
   // Cellules d'un temps (ticks dans le temps) par niveau, avec un poids.
@@ -4637,6 +4672,7 @@ const Piano = (() => {
     if (S.type === 'calib') return calibHit(t);
     if (S.type === 'rhythm') return rhythmHit(t - lat, fromMic);
     if (S.type === 'groove') return grooveHit(t - lat);
+    if (S.type === 'echo') return echoHit(t - lat, fromMic);
   }
   function rhFlash() { const p = document.getElementById('rh-pad'); if (p) { p.classList.remove('flash'); void p.offsetWidth; p.classList.add('flash'); } }
   const rhPad = (label) => `<button class="rh-pad" id="rh-pad" data-act="rh-pad" aria-label="Taper le rythme">${label}<small>Touche ici${matchMedia('(pointer: fine)').matches ? ' ou appuie sur Espace' : ''}</small></button>`;
@@ -4699,26 +4735,30 @@ const Piano = (() => {
       <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
       <p class="hint">L'app compte 1, 2, 3, 4, joue un rythme, puis recompte : à toi de le refrapper, en rythme.</p>
       <div class="panel">
-        <div class="setting"><span class="lbl">Niveau</span>${seg('level', RH_LEVELS, s.level)}
+        <div class="setting"><span class="lbl">Déroulement</span>${seg('mode', [['question', 'Question par question'], ['echo', 'En continu (écho)']], s.mode || 'question')}
+          <p class="hint">${s.mode === 'echo' ? 'Sans aucune pause : une mesure, l\'app joue un rythme ; la mesure suivante, tu le refrappes ; et ça enchaîne. Un voyant juge chaque réponse ; le niveau monte après 3 réussites d\'affilée et redescend après 2 ratés.' : 'Une question à la fois, avec le résultat détaillé après chaque rythme.'}</p></div>
+        <div class="setting"><span class="lbl">${s.mode === 'echo' ? 'Niveau de départ' : 'Niveau'}</span>${seg('level', RH_LEVELS, s.level)}
           <p class="hint">${{ l1: 'Noires (un coup par temps) et notes longues.', l2: 'Noires et croches (deux coups par temps).', l3: 'Avec des silences : des temps ou des débuts de temps sans coup.', l4: 'Syncopes : des coups entre les temps, qui « décalent ».', l5: 'Doubles croches (quatre coups par temps).', l6: 'Triolets (trois coups par temps) et rythmes swing.' }[s.level]}</p></div>
-        <div class="setting"><span class="lbl">Longueur</span>${seg('bars', [[1, '1 mesure'], [2, '2 mesures']], s.bars)}</div>
+        ${s.mode === 'echo' ? `<div class="setting"><span class="lbl">Accompagnement</span>${seg('backing', [['metro', 'Métronome'], ['drums', 'Batterie simple']], s.backing)}</div>
+        <div class="setting"><span class="lbl">Durée</span>${seg('echoLen', [[8, '8 échos'], [16, '16 échos'], [0, 'Sans fin']], s.echoLen)}</div>`
+        : `<div class="setting"><span class="lbl">Longueur</span>${seg('bars', [[1, '1 mesure'], [2, '2 mesures']], s.bars)}</div>`}
         <div class="setting"><label for="bpm">Tempo</label>
           <div class="row-gap">${seg('bpm', [[60, 'Lent'], [80, 'Moyen'], [100, 'Rapide']], s.bpm)}
           <input id="bpm" class="num" type="number" min="40" max="180" inputmode="numeric" value="${s.bpm}" aria-label="Tempo"><span class="muted">BPM</span></div></div>
         <div class="setting"><span class="lbl">Précision demandée</span>${seg('tol', [['loose', 'Souple'], ['normal', 'Normale'], ['strict', 'Stricte']], s.tol)}
           <p class="hint">Un coup est « en place » à ±${Math.round(RH_TOL[s.tol] * 1000)} ms.</p></div>
-        <div class="setting"><span class="lbl">Écoute</span>${seg('listen', [['once', 'Une fois'], ['twice', 'Deux fois']], s.listen)}</div>
+        ${s.mode === 'echo' ? '' : `<div class="setting"><span class="lbl">Écoute</span>${seg('listen', [['once', 'Une fois'], ['twice', 'Deux fois']], s.listen)}</div>`}
       </div>
       <div class="panel">
         <div class="setting"><span class="lbl">Tu réponds</span>${seg('input', [['tap', 'En tapant (écran ou Espace)'], ['mic', 'Au micro (mains, guitare, mélodica)']], s.input)}
           <p class="hint">${s.input === 'mic' ? 'Frappe dans tes mains, gratte ta guitare (même étouffée) ou joue n\'importe quelle note : seule l\'attaque compte.' : 'Sur téléphone, tape sur le grand bouton ; sur ordinateur, aussi avec la barre d\'espace.'}</p></div>
         ${s.input === 'mic' ? `<div class="setting"><span class="lbl">J'ai des écouteurs</span>${seg('headphones', [['false', 'Non'], ['true', 'Oui']], s.headphones)}
           <p class="hint">${s.headphones ? 'Le métronome reste audible pendant ta réponse.' : 'Pendant ta réponse, le métronome devient visuel (le micro l\'entendrait).'}</p></div>` : ''}
-        <div class="setting"><span class="lbl">Métronome</span>${seg('metro', [['true', 'Oui'], ['false', 'Non (seulement le décompte)']], s.metro)}</div>
+        ${s.mode === 'echo' ? '' : `<div class="setting"><span class="lbl">Métronome</span>${seg('metro', [['true', 'Oui'], ['false', 'Non (seulement le décompte)']], s.metro)}</div>`}
         ${rhLatHtml(s.input)}
-        <div class="setting"><label for="q-num">Nombre de questions</label>
+        ${s.mode === 'echo' ? '' : `<div class="setting"><label for="q-num">Nombre de questions</label>
           <div class="row-gap">${seg('questions', [5, 10, 20].map((n) => [n, n]), s.questions)}
-          <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
+          <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>`}
       </div>
       ${s.input === 'mic' ? '<p class="hint">Le micro ne fonctionne pas dans la page épinglée de Claude : ouvre « Ouvrir Hear-Trainer.html » sur ton Mac, ou l\'app installée sur ton téléphone.</p>' : ''}
       <button class="btn wide" data-act="start">Commencer</button>`;
@@ -4813,8 +4853,8 @@ const Piano = (() => {
     renderPlayRhythm();
   }
   /** Grille de cases d'un rythme (une case par double croche, ou par croche de triolet). */
-  function rhGrid(on, bars) {
-    const trip = on.some((x) => x % 12 === 4 || x % 12 === 8), step = trip ? 4 : on.some((x) => x % 6 === 3) ? 3 : 6;
+  function rhGrid(on, bars, forceStep) {
+    const trip = on.some((x) => x % 12 === 4 || x % 12 === 8), step = forceStep || (trip ? 4 : on.some((x) => x % 6 === 3) ? 3 : 6);
     const cells = []; for (let x = 0; x < bars * 48; x += step) cells.push(x);
     return `<div class="rh-grid" style="--n:${12 / step}">${cells.map((x) => `<span class="${on.includes(x) ? 'on' : ''}${x % 12 === 0 ? ' beat' : ''}${x % 48 === 0 ? ' bar' : ''}"></span>`).join('')}</div>`;
   }
@@ -4843,7 +4883,7 @@ const Piano = (() => {
           ${q.avg != null ? `<p class="hint">En moyenne, tu joues ${Math.abs(q.avg) < 0.012 ? 'pile à temps' : `${Math.round(Math.abs(q.avg) * 1000)} ms ${q.avg < 0 ? 'en avance' : 'en retard'}`}.</p>` : ''}</div>
         ${rhTimeline(q, bars)}
         <div class="rh-legend"><span><i style="background:var(--good)"></i>en place</span><span><i style="background:#e39a2d"></i>un peu tôt / tard</span><span><i style="background:var(--bad)"></i>oublié / en trop</span></div>
-        <div class="panel rh-written"><span class="eyebrow">Le rythme</span>${rhGrid(q.on, bars)}<span class="hint">Une case par ${q.on.some((x) => x % 12 === 4 || x % 12 === 8) ? 'croche de triolet' : q.on.some((x) => x % 6 === 3) ? 'double croche' : 'croche'} ; traits plus forts : les temps.</span></div>
+        <div class="panel rh-written"><div class="rr-bar"><span class="eyebrow">Le rythme</span>${rhViewToggle()}</div>${rhShow(q.on, bars)}${rhView() === 'grid' ? `<span class="hint">Une case par ${q.on.some((x) => x % 12 === 4 || x % 12 === 8) ? 'croche de triolet' : q.on.some((x) => x % 6 === 3) ? 'double croche' : 'croche'} ; un espace sépare les temps.</span>` : ''}</div>
         <div class="controls"><button class="ctl" data-act="rh-listen">${ICON.note}Réécouter le rythme</button></div>
         <div class="actions"><button class="btn secondary" data-act="rh-retry">Réessayer</button><button class="btn" data-act="rh-next">${S.i >= S.n ? 'Voir le bilan' : 'Question suivante'}</button></div>`;
       return;
@@ -4858,24 +4898,147 @@ const Piano = (() => {
   }
 
   /* ----- Jouer en place sur un groove ----- */
+  /* ----- Reproduire un rythme · en continu (écho) : une mesure d'écoute, une mesure de réponse, sans pause ----- */
+  const RH_LV = ['l1', 'l2', 'l3', 'l4', 'l5', 'l6'];
+  async function startEchoSession() {
+    const s = { ...draft.settings };
+    S = { type: 'echo', title: 'Reproduire un rythme · écho', set: s, n: 0, i: 0, firstTry: 0, missed: {}, skipped: 0, running: false, finished: false };
+    screen = 'play'; pushScreen();
+    $app.innerHTML = '<div class="loading">Chargement…</div>';
+    await Piano.unlock();
+    if (!S) return;
+    if (s.input === 'mic') { try { await micStart(); } catch (e) { return micError(e); } rhMicStart((t) => rhHit(t, true)); }
+    renderPlayEcho();
+  }
+  function startEcho() {
+    tonicStop(); cancelAnimationFrame(RHY.raf);
+    const s = S.set, ctx = Piano.ctx, beat = 60 / s.bpm, bar = 4 * beat, T0 = ctx.currentTime + 0.3;
+    const quiet = s.input === 'mic' && !s.headphones, drums = s.backing === 'drums';
+    for (let b = 0; b < 4; b++) improvClick(T0 + b * beat, b === 0);
+    Object.assign(S, { running: true, finished: false, beat, bar, start: T0 + bar, k: 0, cycles: [], taps: [], results: [], lvl: Math.max(0, RH_LV.indexOf(s.level)), maxLvl: 0, streak: 0, best: 0, fails: 0,
+      total: Number(s.echoLen) || Infinity });
+    S.maxLvl = S.lvl;
+    const backing = (t, answer) => {
+      for (let b = 0; b < 4; b++) {
+        if (answer && quiet) continue;
+        if (drums) { if (b % 2 === 0) drumHit('kick', t + b * beat, 0.9); else drumHit('snare', t + b * beat, 0.7); drumHit('hat', t + b * beat, 0.8); drumHit('hat', t + b * beat + beat / 2, 0.5); }
+        else improvClick(t + b * beat, b === 0, answer ? 0.6 : 1);
+      }
+    };
+    const pump = () => {
+      while (S && S.type === 'echo' && S.running && S.k < S.total && S.start + 2 * S.k * bar < Piano.ctx.currentTime + 0.8) {
+        const A = S.start + 2 * S.k * bar, B = A + bar, on = rhGenerate(RH_LV[S.lvl], 1);
+        on.forEach((x) => woodHit(A + (x / 12) * beat));
+        backing(A, false); backing(B, true);
+        S.cycles.push({ k: S.k, on, A, B, lvl: S.lvl, exp: on.map((x) => B + (x / 12) * beat) });
+        S.k++;
+      }
+    };
+    pump(); TON.pump = setInterval(pump, 120);
+    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then((w) => { LOOP.wake = w; }).catch(() => {}); } catch (e) {}
+    renderPlayEcho();
+    const tick = () => {
+      if (!S || S.type !== 'echo' || !S.running) return;
+      const now = Piano.ctx.currentTime;
+      S.cycles.forEach((c) => { if (!c.done && now > c.B + bar + 0.15) echoCheck(c); });
+      const cur = S.cycles.find((c) => now >= c.A && now < c.B + bar);
+      const ph = document.getElementById('echo-phase'), dots = $app.querySelectorAll('.beat-dot'), b = Math.floor((now - T0) / beat);
+      dots.forEach((d, k) => d.classList.toggle('on', b >= 0 && k === b % 4));
+      if (ph) {
+        const answer = cur && now >= cur.B, txt = !cur ? (now < S.start ? 'Prêt… ' + Math.min(4, b + 1) : '') : answer ? 'À toi !' : 'Écoute';
+        if (ph.textContent !== txt) { ph.textContent = txt; ph.className = 'echo-phase' + (answer ? ' you' : ''); }
+      }
+      if (S.total !== Infinity && S.results.length >= S.total) return finishEcho();
+      RHY.raf = requestAnimationFrame(tick);
+    };
+    RHY.raf = requestAnimationFrame(tick);
+  }
+  function echoHit(t, fromMic) { if (!S.running) return; if (!fromMic) rhFlash(); S.taps.push(t); }
+  /** Une réponse jugée : voyant, et le niveau monte (3 réussites d'affilée) ou descend (2 ratés d'affilée). */
+  function echoCheck(c) {
+    c.done = true;
+    const tol = RH_TOL[S.set.tol] || 0.06, bar = S.bar;
+    const taps = S.taps.filter((t) => t >= c.B - 0.15 && t <= c.B + bar + 0.15);
+    const m = rhMatch(c.exp, taps, tol), ok = m.res.every((r) => r.st === 'ok') && !m.extra.length;
+    const near = !ok && m.res.every((r) => r.st !== 'miss') && !m.extra.length;   // tous les coups là, mais pas tous bien placés
+    S.results.push(ok ? 'ok' : near ? 'near' : 'no');
+    if (ok) { S.firstTry++; S.streak++; S.fails = 0; S.best = Math.max(S.best, S.streak); if (S.streak % 3 === 0 && S.lvl < RH_LV.length - 1) S.lvl++; }
+    else { S.streak = 0; S.fails++; const k = m.res.some((r) => r.st === 'miss') ? 'coup oublié' : m.extra.length ? 'coup en trop' : 'pas en place'; S.missed[k] = (S.missed[k] || 0) + 1; if (S.fails >= 2 && S.lvl > 0) { S.lvl--; S.fails = 0; } }
+    S.maxLvl = Math.max(S.maxLvl, S.lvl);
+    const strip = document.getElementById('echo-strip'), lv = document.getElementById('echo-lvl');
+    if (strip) strip.innerHTML = echoStrip();
+    if (lv) lv.textContent = RH_LEVELS[S.lvl][1];
+  }
+  const echoStrip = () => S.results.slice(-16).map((r) => `<i class="${r}"></i>`).join('');
+  function finishEcho() {
+    if (!S || S.finished) return;
+    S.running = false; tonicStop(); cancelAnimationFrame(RHY.raf);
+    if (LOOP.wake) { try { LOOP.wake.release(); } catch (e) {} LOOP.wake = null; }
+    S.finished = true; S.n = S.results.length;
+    recordSession(false);
+    renderPlayEcho();
+  }
+  function renderPlayEcho() {
+    const s = S.set;
+    const head = `<header class="top"><button class="link-btn" data-act="home">‹ Quitter</button><span class="eyebrow">Écho · ${s.bpm} BPM</span><span class="score">${S.running || S.finished ? S.firstTry + ' ✓' : ''}</span></header>`;
+    if (S.finished) {
+      const n = S.results.length, pct = n ? Math.round((100 * S.firstTry) / n) : 0;
+      $app.innerHTML = head + `
+        <div class="panel" style="text-align:center;align-items:center"><span class="eyebrow">Écho · terminé</span>
+          <div class="big-score">${S.firstTry}<small> / ${n}</small></div><p class="muted">échos réussis (${pct} %)</p></div>
+        <div class="panel gr-stats">
+          <div><b>Meilleure série : ${S.best}</b><span>échos réussis d'affilée</span></div>
+          <div><b>Plus haut niveau : ${esc(RH_LEVELS[S.maxLvl][1])}</b><span>atteint pendant l'exercice</span></div>
+          <div class="echo-strip big">${S.results.slice(-32).map((r) => `<i class="${r}"></i>`).join('')}</div>
+        </div>
+        <div class="actions"><button class="btn secondary" data-act="home">Quitter</button><button class="btn" data-act="echo-again">Recommencer</button></div>`;
+      return;
+    }
+    $app.innerHTML = head + `
+      <div class="stage"><span class="eyebrow">Une mesure : écoute · la suivante : réponds</span>
+        <p class="echo-phase" id="echo-phase">${S.running ? '' : 'Prêt ?'}</p>
+        <p class="hint">Niveau : <b id="echo-lvl">${esc(RH_LEVELS[S.running ? S.lvl : Math.max(0, RH_LV.indexOf(s.level))][1])}</b> · il monte après 3 réussites d'affilée</p></div>
+      <div class="improv-run"><div class="beats">${[0, 1, 2, 3].map((b) => `<span class="beat-dot${b === 0 ? ' accent' : ''}"></span>`).join('')}</div>
+        <div class="echo-strip" id="echo-strip">${S.results ? echoStrip() : ''}</div></div>
+      ${s.input === 'mic' ? `<div class="mic-panel"><span class="mic-icon">${ICON.mic}</span><span>Réponds au micro sur « À toi ! »</span></div>` : rhPad('●')}
+      ${S.running ? `<button class="btn secondary wide" data-act="echo-stop">${S.total === Infinity ? 'Arrêter et voir le bilan' : 'Arrêter'}</button>` : '<button class="btn wide" data-act="echo-go">C\'est parti</button>'}`;
+  }
+
   const GR_TARGETS = [['beats', 'Chaque temps'], ['backbeat', 'Sur 2 et 4'], ['eighths', 'En croches'], ['offbeats', 'Contretemps'], ['tresillo', 'Motif 3-3-2']];
   const grTicks = (target, bpb) => ({ beats: Array.from({ length: bpb }, (_, b) => b * 12), backbeat: [12, 36], eighths: Array.from({ length: 2 * bpb }, (_, k) => k * 6), offbeats: Array.from({ length: bpb }, (_, b) => b * 12 + 6), tresillo: [0, 18, 36] }[target]);
+  // Consigne qui change : échelle de difficulté (rang) → un motif d'une mesure. Les 5 premiers rangs : les consignes fixes ; ensuite, motifs tirés des niveaux de rythme.
+  const GR_RANKS = ['beats', 'backbeat', 'eighths', 'offbeats', 'tresillo', 'l3', 'l4', 'l5', 'l6'];
+  const GR_RANK_LBL = ['chaque temps', 'sur 2 et 4', 'croches', 'contretemps', 'motif 3-3-2', 'silences', 'syncopes', 'doubles croches', 'triolets'];
+  function grMotif(rank, prev) {
+    const r = GR_RANKS[Math.max(0, Math.min(GR_RANKS.length - 1, rank))];
+    if (!/^l\d/.test(r)) return { on: grTicks(r, 4), rank };
+    for (let k = 0; k < 20; k++) { const on = rhGenerate(r, 1); if (!prev || on.join() !== prev.join()) return { on, rank }; }
+    return { on: rhGenerate(r, 1), rank };
+  }
   function renderSetupGroove() {
     const { ex, settings: s } = draft;
+    const change = s.mode === 'change';
     $app.innerHTML = `
       <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
       <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
       <p class="hint">Un groupe joue : tape (ou joue) exactement avec lui, selon la consigne. L'app mesure si tu es en avance, en retard, et si tu es régulier.</p>
       <div class="panel">
-        <div class="setting"><span class="lbl">Consigne</span>${seg('target', GR_TARGETS, s.target)}
-          <p class="hint">${{ beats: 'Un coup sur chaque temps : 1, 2, 3, 4.', backbeat: 'Sur 2 et 4, avec la caisse claire : le « backbeat ».', eighths: 'Deux coups par temps, réguliers.', offbeats: 'Seulement sur les « et », entre les temps (comme le skank du reggae).', tresillo: 'Le motif 3-3-2 : sur 1, sur le « et » de 2, et sur 4.' }[s.target]}</p></div>
+        <div class="setting"><span class="lbl">Consigne</span>${seg('mode', [['fixed', 'Fixe'], ['change', 'Qui change (en continu)']], s.mode || 'fixed')}
+          <p class="hint">${change ? 'Le groupe ne s\'arrête jamais : le motif à jouer change régulièrement. Le prochain s\'affiche une mesure avant, avec un décompte : bascule pile sur le 1. Si tu es bien en place, les motifs deviennent plus difficiles ; si tu décroches, ils redeviennent plus simples.' : 'Un seul motif pendant tout l\'exercice.'}</p></div>
+        ${change ? `<div class="setting"><span class="lbl">Le motif change toutes les</span>${seg('every', [[2, '2 mesures'], [4, '4 mesures'], [8, '8 mesures']], s.every)}</div>
+        <div class="setting"><span class="lbl">Motif de départ</span>${seg('startRank', GR_RANKS.map((_, i) => [i, GR_RANK_LBL[i]]), s.startRank)}</div>
+        <div class="setting"><span class="lbl">Entendre le nouveau motif</span>${seg('hearNext', [['false', 'Non, le voir seulement'], ['true', 'Oui (un petit son)']], s.hearNext)}
+          <p class="hint">${s.hearNext ? 'Un petit son joue le nouveau motif pendant sa première mesure.' : 'Tu lis le motif (en cases ou en notes) et tu t\'adaptes, sans aide sonore.'}</p></div>`
+        : `<div class="setting"><span class="lbl">Motif</span>${seg('target', GR_TARGETS, s.target)}
+          <p class="hint">${{ beats: 'Un coup sur chaque temps : 1, 2, 3, 4.', backbeat: 'Sur 2 et 4, avec la caisse claire : le « backbeat ».', eighths: 'Deux coups par temps, réguliers.', offbeats: 'Seulement sur les « et », entre les temps (comme le skank du reggae).', tresillo: 'Le motif 3-3-2 : sur 1, sur le « et » de 2, et sur 4.' }[s.target]}</p></div>`}
         <div class="setting"><span class="lbl">Style</span>${seg('drums', DRUM_STYLES.filter(([v]) => v !== 'none' && v !== 'waltz'), s.drums)}</div>
         <div class="setting"><label for="bpm">Tempo</label>
           <div class="row-gap">${seg('bpm', [[70, 'Lent'], [90, 'Moyen'], [110, 'Rapide']], s.bpm)}
           <input id="bpm" class="num" type="number" min="40" max="180" inputmode="numeric" value="${s.bpm}" aria-label="Tempo"><span class="muted">BPM</span></div></div>
-        <div class="setting"><span class="lbl">Durée</span>${seg('length', [[8, '8 mesures'], [16, '16 mesures'], [32, '32 mesures']], s.length)}</div>
-        <div class="setting"><span class="lbl">Garde le tempo</span>${seg('gap', [['false', 'Non'], ['true', 'Oui']], s.gap)}
-          <p class="hint">${s.gap ? 'Toutes les 4 mesures, le groupe se tait pendant 2 mesures : continue seul, il revient… et l\'app voit si tu as accéléré ou ralenti.' : 'Le groupe joue tout le long.'}</p></div>
+        <div class="setting"><span class="lbl">Durée</span>${seg('length', [[8, '8 mesures'], [16, '16 mesures'], [32, '32 mesures'], [0, 'Sans fin']], s.length)}
+          ${Number(s.length) === 0 ? '<p class="hint">Ça tourne jusqu\'à ce que tu arrêtes : le bilan s\'affiche à ce moment-là.</p>' : ''}</div>
+        ${change ? '' : `<div class="setting"><span class="lbl">Garde le tempo</span>${seg('gap', [['false', 'Non'], ['true', 'Oui']], s.gap)}
+          <p class="hint">${s.gap ? 'Toutes les 4 mesures, le groupe se tait pendant 2 mesures : continue seul, il revient… et l\'app voit si tu as accéléré ou ralenti.' : 'Le groupe joue tout le long.'}</p></div>`}
       </div>
       <div class="panel">
         <div class="setting"><span class="lbl">Tu réponds</span>${seg('input', [['tap', 'En tapant (écran ou Espace)'], ['mic', 'Au micro (mains, guitare, mélodica)']], s.input)}
@@ -4888,7 +5051,7 @@ const Piano = (() => {
   async function startGrooveSession() {
     const s = { ...draft.settings, style: 'auto', bpc: 1, metro: false, scale: 'major', loop: 'Pop' };
     S = { type: 'groove', title: 'Jouer en place', set: s, mode: 'major', resScale: M.SCALES.major.notes, keyPc: M.pickKey('random-not-c', null),
-      n: 0, i: 0, firstTry: 0, missed: {}, running: false, finished: false, loop: null, abs: -1, total: Number(s.length) || 16, hits: [], last: null };
+      n: 0, i: 0, firstTry: 0, missed: {}, running: false, finished: false, loop: null, abs: -1, total: Number(s.length) || Infinity, hits: [], last: null };
     pickLoop();
     screen = 'play'; pushScreen();
     $app.innerHTML = '<div class="loading">Chargement…</div>';
@@ -4897,16 +5060,44 @@ const Piano = (() => {
     if (s.input === 'mic') { try { await micStart(); } catch (e) { return micError(e); } rhMicStart((t) => rhHit(t, true)); }
     renderPlayGroove();
   }
-  const grSilent = (bar) => S.set.gap && bar >= 4 && (bar - 4) % 6 < 2 && bar < S.total;   // 4 mesures avec le groupe, 2 sans (après les 4 premières)
+  const grSilent = (bar) => S.set.mode !== 'change' && S.set.gap && bar >= 4 && (bar - 4) % 6 < 2 && bar < S.total;   // 4 mesures avec le groupe, 2 sans (après les 4 premières)
+  const grChange = () => S.set.mode === 'change';
+  const grEvery = () => Number(S.set.every) || 4;
+  /** Motif d'un bloc (consigne qui change) : décidé une mesure avant, selon ta précision sur le bloc en cours. */
+  function grBlockMotif(blk) {
+    if (S.blocks[blk]) return S.blocks[blk];
+    let rank = Number(S.set.startRank) || 0;
+    if (blk > 0) {
+      const prev = grBlockMotif(blk - 1), now = Piano.ctx.currentTime;
+      const ex = S.expected.filter((e) => e.block === blk - 1 && e.t < now - 0.1), ok = ex.filter((e) => e.hit && Math.abs(e.d) <= 0.06).length;
+      const acc = ex.length ? ok / ex.length : 0;
+      rank = acc >= 0.8 ? prev.rank + 1 : acc < 0.5 ? prev.rank - 1 : prev.rank;
+      rank = Math.max(0, Math.min(GR_RANKS.length - 1, rank));
+      S.blocks[blk - 1].acc = acc;
+      return (S.blocks[blk] = grMotif(rank, prev.on));
+    }
+    return (S.blocks[blk] = grMotif(rank));
+  }
+  /** Coups attendus d'une mesure (ajoutés quand la mesure est programmée). */
+  function grAddBar(bar, at) {
+    const beat = S.beat, blk = grChange() ? Math.floor(bar / grEvery()) : 0;
+    const on = grChange() ? grBlockMotif(blk).on : S.fixedTicks;
+    on.forEach((x) => S.expected.push({ t: at + (x / 12) * beat, bar, block: blk, first: grChange() && bar % grEvery() === 0 && blk > 0 }));
+    if (grChange()) {
+      S.maxRank = Math.max(S.maxRank || 0, grBlockMotif(blk).rank);
+      if (bar % grEvery() === grEvery() - 1) grBlockMotif(blk + 1);   // le prochain motif est choisi (et affiché) une mesure avant
+      if (bar % grEvery() === 0 && S.set.hearNext && blk > 0) on.forEach((x) => woodHit(at + (x / 12) * beat, 0.5, 1500));
+    }
+  }
   function startGroove() {
     loopStop(); Piano.stopAll();
     const s = S.set, ctx = Piano.ctx, beat = 60 / s.bpm, bpb = 4, chordDur = bpb * beat;
     const T0 = ctx.currentTime + 0.3, start = T0 + bpb * beat;
     for (let b = 0; b < bpb; b++) improvClick(T0 + b * beat, b === 0);
-    Object.assign(S, { running: true, finished: false, beat, beat0: beat, bpmNow: s.bpm, bpb, chordDur, slotDur: chordDur, start, next: 0, nextAt: start, abs: -1, marks: [], hits: [], last: null, mute: grSilent });
-    const ticks = grTicks(s.target, bpb);
-    S.expected = []; for (let bar = 0; bar < S.total; bar++) ticks.forEach((x) => S.expected.push({ t: start + bar * chordDur + (x / 12) * beat, bar }));
-    loopBarSet(start, chordDur * S.total, start + chordDur * S.total, '[data-act=gr-stop]');
+    Object.assign(S, { running: true, finished: false, beat, beat0: beat, bpmNow: s.bpm, bpb, chordDur, slotDur: chordDur, start, next: 0, nextAt: start, abs: -1, marks: [], hits: [], last: null, mute: grSilent,
+      total: Number(s.length) || Infinity, expected: [], blocks: S.blocks && S.blocks[0] ? [S.blocks[0]] : [], maxRank: 0, fixedTicks: grTicks(s.target, bpb), onBar: grAddBar, shownBar: -2 });
+    if (grChange()) grBlockMotif(0);
+    if (S.total !== Infinity) loopBarSet(start, chordDur * S.total, start + chordDur * S.total, '[data-act=gr-stop]');
     const pump = () => { if (S && S.type === 'groove') loopPump('[data-act=gr-stop]'); };
     pump(); LOOP.timer = setInterval(pump, 120);
     try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then((w) => { LOOP.wake = w; }).catch(() => {}); } catch (e) {}
@@ -4916,16 +5107,28 @@ const Piano = (() => {
       const now = Piano.ctx.currentTime, dots = $app.querySelectorAll('.beat-dot'), b = Math.floor((now - (start - bpb * beat)) / beat);
       dots.forEach((d, k) => d.classList.toggle('on', b >= 0 && k === b % bpb));
       const bar = Math.floor((now - start) / chordDur), ph = document.getElementById('gr-phase');
-      if (ph) ph.textContent = now < start ? 'Départ… ' + Math.min(4, b + 1) : grSilent(bar) ? 'Seul ! Garde le tempo…' : `Mesure ${Math.min(bar + 1, S.total)} / ${S.total}`;
+      if (ph) ph.textContent = now < start ? 'Départ… ' + Math.min(4, b + 1) : grSilent(bar) ? 'Seul ! Garde le tempo…' : S.total === Infinity ? `Mesure ${bar + 1}` : `Mesure ${Math.min(bar + 1, S.total)} / ${S.total}`;
+      if (grChange()) grMotifUpdate(now, bar, b);
       if (now > start + S.total * chordDur + 0.3) return finishGroove();
       LOOP.raf = requestAnimationFrame(tick);
     };
     LOOP.raf = requestAnimationFrame(tick);
   }
+  /** Consigne qui change : le motif en cours et le suivant (décompte pendant la dernière mesure du bloc). */
+  function grMotifUpdate(now, bar, beatAbs) {
+    const el = document.getElementById('gr-motif'); if (!el) return;
+    const E = grEvery(), cur = Math.max(0, bar), blk = Math.floor(cur / E), last = cur % E === E - 1 && bar >= 0;
+    const key = `${cur}|${last ? Math.floor((now - S.start) / S.beat) % 4 : ''}|${rhView()}`;
+    if (key === S.shownKey) return;
+    S.shownKey = key;
+    const m = grBlockMotif(blk), nx = last ? S.blocks[blk + 1] : null, left = 4 - (Math.floor((now - S.start) / S.beat) % 4);
+    el.innerHTML = `<div class="gr-now"><span class="eyebrow">${bar < 0 ? 'Premier motif' : 'Maintenant'} · ${esc(GR_RANK_LBL[m.rank])}</span>${rhShow(m.on, 1)}</div>
+      ${nx ? `<div class="gr-next"><span class="eyebrow">Ensuite, dans ${left} · ${esc(GR_RANK_LBL[nx.rank])}${nx.rank > m.rank ? ' ↑' : nx.rank < m.rank ? ' ↓' : ''}</span>${rhShow(nx.on, 1)}</div>` : ''}`;
+  }
   function grooveHit(t) {
     if (!S.running) return;
     rhFlash();
-    let best = null; S.expected.forEach((e) => { if (best == null || Math.abs(t - e.t) < Math.abs(t - best.t)) best = e; });
+    let best = null; for (let i = S.expected.length - 1; i >= 0 && i >= S.expected.length - 80; i--) { const e = S.expected[i]; if (best == null || Math.abs(t - e.t) < Math.abs(t - best.t)) best = e; }
     if (!best || Math.abs(t - best.t) > (60 / S.set.bpm) * 0.5) return;
     if (best.hit) return;   // déjà joué : coup en trop, ignoré
     best.hit = true; best.d = t - best.t;
@@ -4936,28 +5139,32 @@ const Piano = (() => {
   }
   function finishGroove() {
     if (!S || S.finished) return;
+    const now = Piano.ctx.currentTime;
     S.running = false; loopStop(); Piano.stopAll(); cancelAnimationFrame(LOOP.raf);
-    const ex = S.expected, played = ex.filter((e) => e.hit), tol = 0.06;
+    const ex = S.expected.filter((e) => e.t < now - 0.05), played = ex.filter((e) => e.hit), tol = 0.06;
     const ds = played.map((e) => e.d), mean = ds.length ? ds.reduce((a, b) => a + b, 0) / ds.length : 0;
     const sd = ds.length > 1 ? Math.sqrt(ds.reduce((a, d) => a + (d - mean) * (d - mean), 0) / ds.length) : 0;
     const inPlace = played.filter((e) => Math.abs(e.d) <= tol).length;
     const sil = played.filter((e) => grSilent(e.bar)), silMean = sil.length ? sil.reduce((a, e) => a + e.d, 0) / sil.length : null;
-    Object.assign(S, { finished: true, stats: { n: ex.length, played: played.length, inPlace, mean, sd, silMean, silN: sil.length } });
+    const firsts = ex.filter((e) => e.first), firstOk = firsts.filter((e) => e.hit && Math.abs(e.d) <= tol).length;
+    Object.assign(S, { finished: true, stats: { n: ex.length, played: played.length, inPlace, mean, sd, silMean, silN: sil.length, firstN: firsts.length, firstOk, maxRank: S.maxRank, bars: ex.length ? ex[ex.length - 1].bar + 1 : 0 } });
     S.firstTry = inPlace; S.n = ex.length;
     if (Math.abs(mean) > 0.03) S.missed[mean < 0 ? 'en avance' : 'en retard'] = 1;
     recordSession(false);
     renderPlayGroove();
   }
   function renderPlayGroove() {
-    const s = S.set, ms = (d) => `${Math.round(Math.abs(d) * 1000)} ms`;
+    const s = S.set, ms = (d) => `${Math.round(Math.abs(d) * 1000)} ms`, change = grChange();
     const head = `<header class="top"><button class="link-btn" data-act="home">‹ Quitter</button><span class="eyebrow">Jouer en place · ${s.bpm} BPM</span><span></span></header>`;
     if (S.finished) {
       const st = S.stats, pct = st.n ? Math.round((100 * st.inPlace) / st.n) : 0;
       const reg = st.sd < 0.02 ? 'très régulier' : st.sd < 0.035 ? 'régulier' : st.sd < 0.055 ? 'assez irrégulier' : 'irrégulier';
       $app.innerHTML = head + `
-        <div class="panel" style="text-align:center;align-items:center"><span class="eyebrow">Jouer en place · terminé</span>
+        <div class="panel" style="text-align:center;align-items:center"><span class="eyebrow">Jouer en place · terminé${change ? ` · ${st.bars} mesures` : ''}</span>
           <div class="big-score">${pct}<small> %</small></div><p class="muted">des coups en place (à ±60 ms) : ${st.inPlace} sur ${st.n}${st.played < st.n ? ` · ${st.n - st.played} oubliés` : ''}</p></div>
         <div class="panel gr-stats">
+          ${change ? `<div><b>Plus haut niveau : ${esc(GR_RANK_LBL[st.maxRank])}</b><span>atteint pendant l'exercice</span></div>
+          ${st.firstN ? `<div><b>${Math.round((100 * st.firstOk) / st.firstN)} % en place juste après un changement</b><span>la première mesure de chaque nouveau motif</span></div>` : ''}` : ''}
           <div><b>${Math.abs(st.mean) < 0.012 ? 'Pile à temps' : `${ms(st.mean)} ${st.mean < 0 ? 'en avance' : 'en retard'}`}</b><span>en moyenne${Math.abs(st.mean) >= 0.03 ? (st.mean < 0 ? ' : tu as tendance à presser' : ' : tu as tendance à traîner') : ''}</span></div>
           <div><b>${reg}</b><span>tes écarts varient de ±${ms(st.sd)}</span></div>
           ${st.silN ? `<div><b>${Math.abs(st.silMean) < 0.02 ? 'Tempo gardé' : st.silMean < 0 ? 'Tu as accéléré' : 'Tu as ralenti'}</b><span>quand le groupe se taisait (en moyenne ${ms(st.silMean)} ${st.silMean < 0 ? 'en avance' : 'en retard'})</span></div>` : ''}
@@ -4967,22 +5174,197 @@ const Piano = (() => {
       return;
     }
     $app.innerHTML = head + `
-      <div class="stage"><span class="eyebrow">${esc(GR_TARGETS.find((x) => x[0] === s.target)[1])} · ${esc((DRUM_STYLES.find((x) => x[0] === s.drums) || ['', ''])[1])}</span>
+      <div class="stage"><span class="eyebrow">${change ? 'Consigne qui change' : esc(GR_TARGETS.find((x) => x[0] === s.target)[1])} · ${esc((DRUM_STYLES.find((x) => x[0] === s.drums) || ['', ''])[1])}</span>
         <p class="status" id="gr-phase">${S.running ? '' : 'Prêt ? Le groupe compte 4 temps, puis c\'est parti.'}</p></div>
+      ${change ? `<div class="rr-bar"><span></span>${rhViewToggle()}</div><div class="gr-motif" id="gr-motif"></div>` : ''}
       <div class="improv-run"><div class="beats">${[0, 1, 2, 3].map((b) => `<span class="beat-dot${b === 0 ? ' accent' : ''}"></span>`).join('')}</div></div>
       <div class="gr-meter"><span>en avance</span><div class="gr-track"><i class="gr-mid"></i><i class="gr-needle" id="gr-needle"></i></div><span>en retard</span></div>
       <p class="hint" id="gr-dev" style="text-align:center">${S.running ? '' : '&nbsp;'}</p>
       ${s.input === 'mic' ? `<div class="mic-panel"><span class="mic-icon">${ICON.mic}</span><span>Joue avec le groupe (écouteurs !)</span></div>` : rhPad('●')}
-      ${S.running ? '<button class="btn secondary wide" data-act="gr-stop">Arrêter</button>' : '<button class="btn wide" data-act="gr-go">C\'est parti</button>'}`;
+      ${S.running ? `<button class="btn secondary wide" data-act="gr-stop">${S.total === Infinity ? 'Arrêter et voir le bilan' : 'Arrêter'}</button>` : '<button class="btn wide" data-act="gr-go">C\'est parti</button>'}`;
+    if (change && !S.running) { S.blocks = S.blocks && S.blocks.length ? S.blocks : []; S.expected = S.expected || []; if (!S.blocks[0]) S.blocks[0] = grMotif(Number(s.startRank) || 0); S.shownKey = null; grMotifUpdate(0, -1, 0); }
+    if (change && S.running) { S.shownKey = null; }
   }
   function rhStopAll() { cancelAnimationFrame(RHY.raf); clearTimeout(RHY.calT); rhMicStop(); }
   // Entrées : toucher (dès que le doigt touche), barre d'espace.
   $app.addEventListener('pointerdown', (e) => { if (e.target.closest('#rh-pad')) { e.preventDefault(); rhHit(rhTapTime(e), false); } });
   document.addEventListener('keydown', (e) => {
-    if (e.code !== 'Space' || e.repeat || screen !== 'play' || !S || !['rhythm', 'groove', 'calib'].includes(S.type)) return;
+    if (e.code !== 'Space' || e.repeat || screen !== 'play' || !S || !['rhythm', 'groove', 'calib', 'echo'].includes(S.type)) return;
     if (S.type !== 'calib' && S.set.input === 'mic') return;
     e.preventDefault(); rhHit(rhTapTime(e), false);
   });
+
+  /* ---------- Notation d'un rythme d'une ou deux mesures (ligne de percussion) ---------- */
+  /** Découpe chaque temps en notes et silences : [{ x (tick dans le temps), d (durée en doubles croches, ou 't' triolet), rest }]. */
+  function rhBeatParts(on, beat) {
+    const ins = on.filter((x) => Math.floor(x / 12) === beat).map((x) => x % 12);
+    if (ins.some((x) => x % 12 === 4 || x % 12 === 8)) {   // triolet de croches
+      return { trip: true, parts: [0, 4, 8].map((x) => ({ x, rest: !ins.includes(x), d: 2 })) };
+    }
+    if (!ins.length) return { parts: [{ x: 0, d: 4, rest: true }] };
+    const parts = [], s16 = ins.map((x) => x / 3);
+    if (s16[0] > 0) parts.push(s16[0] === 2 ? { x: 0, d: 2, rest: true } : s16[0] === 1 ? { x: 0, d: 1, rest: true } : { x: 0, d: 3, rest: true });
+    s16.forEach((p, k) => { const end = k + 1 < s16.length ? s16[k + 1] : 4; parts.push({ x: p * 3, d: end - p, rest: false }); });
+    return { parts };
+  }
+  /** Dessin SVG : têtes de notes, hampes, ligatures (croches, doubles croches), silences, triolets. */
+  function rhNotation(on, bars) {
+    const BW = 72, W = bars * 4 * BW + 24, H = 70, Y = 46, stemTop = 14;
+    let svg = `<line x1="4" x2="${W - 4}" y1="${Y}" y2="${Y}" stroke="var(--line)" stroke-width="1.5"/>`;
+    for (let b = 0; b <= bars; b++) svg += `<line x1="${8 + b * 4 * BW}" x2="${8 + b * 4 * BW}" y1="${Y - 14}" y2="${Y + 14}" stroke="var(--muted)" stroke-width="${b === 0 || b === bars ? 2.5 : 1.5}"/>`;
+    const restGlyph = (x, d) => d >= 4 ? `<path d="M${x - 3} ${Y - 14} l6 7 l-5 6 l6 7 q-7 -3 -6 4" fill="none" stroke="var(--ink)" stroke-width="2.4" stroke-linejoin="round"/>`
+      : d >= 2 ? `<circle cx="${x - 2}" cy="${Y - 6}" r="2.6" fill="var(--ink)"/><path d="M${x - 2} ${Y - 5} q4 1 6 -3 l-5 15" fill="none" stroke="var(--ink)" stroke-width="2"/>`
+      : `<circle cx="${x - 2}" cy="${Y - 8}" r="2.4" fill="var(--ink)"/><circle cx="${x - 4}" cy="${Y - 1}" r="2.4" fill="var(--ink)"/><path d="M${x - 2} ${Y - 7} q4 1 6 -3 l-6 19 M${x - 4} ${Y} q4 1 6 -3" fill="none" stroke="var(--ink)" stroke-width="1.8"/>`;
+    for (let b = 0; b < 4 * bars; b++) {
+      const x0 = 18 + b * BW + (b >= 4 ? 0 : 0) + Math.floor(b / 4) * 0, { trip, parts } = rhBeatParts(on, b);
+      const px = (x) => x0 + (x / 12) * (BW - 14);
+      const notes = parts.filter((p) => !p.rest);
+      parts.filter((p) => p.rest).forEach((p) => { svg += restGlyph(px(p.x) + 4, trip ? 2 : p.d); });
+      notes.forEach((p) => {
+        const x = px(p.x);
+        svg += `<ellipse cx="${x}" cy="${Y}" rx="6" ry="4.4" transform="rotate(-20 ${x} ${Y})" fill="var(--ink)"/><line x1="${x + 5.4}" x2="${x + 5.4}" y1="${Y - 2}" y2="${stemTop}" stroke="var(--ink)" stroke-width="1.6"/>`;
+        if (p.d === 3) svg += `<circle cx="${x + 11}" cy="${Y - 1}" r="1.9" fill="var(--ink)"/>`;   // croche pointée
+      });
+      const beamable = notes.filter((p) => trip || p.d < 4);
+      const nb = (p) => (trip ? 1 : p.d === 1 ? 2 : 1);
+      if (beamable.length >= 2) {
+        const xs = beamable.map((p) => px(p.x) + 5.4);
+        svg += `<rect x="${xs[0]}" y="${stemTop}" width="${xs[xs.length - 1] - xs[0]}" height="4.5" fill="var(--ink)"/>`;
+        beamable.forEach((p, k) => {   // 2e ligature des doubles croches (morceau vers la voisine, ou crochet)
+          if (nb(p) < 2) return;
+          const nx = beamable[k + 1] && nb(beamable[k + 1]) === 2 ? xs[k + 1] : null;
+          if (nx != null) svg += `<rect x="${xs[k]}" y="${stemTop + 7}" width="${nx - xs[k]}" height="4.5" fill="var(--ink)"/>`;
+          else if (!(k > 0 && nb(beamable[k - 1]) === 2)) { const dir = k + 1 < beamable.length ? 1 : -1; svg += `<rect x="${dir > 0 ? xs[k] : xs[k] - 9}" y="${stemTop + 7}" width="9" height="4.5" fill="var(--ink)"/>`; }
+        });
+      } else if (beamable.length === 1) {   // croche ou double croche seule : crochet(s)
+        const p = beamable[0], x = px(p.x) + 5.4;
+        for (let f = 0; f < nb(p); f++) svg += `<path d="M${x} ${stemTop + f * 7} q7 5 6 15" fill="none" stroke="var(--ink)" stroke-width="2.2"/>`;
+      }
+      if (trip) svg += `<text x="${px(4) + 5}" y="${stemTop - 3}" text-anchor="middle" font-size="11" font-style="italic" font-weight="700" fill="var(--muted)">3</text>`;
+    }
+    return `<svg class="rh-notation" viewBox="0 0 ${W} ${H}" role="img" aria-label="Rythme en notation">${svg}</svg>`;
+  }
+  /** Affichage d'un rythme selon le choix (cases ou notation), gardé d'une fois à l'autre. */
+  const rhView = () => Store.get('rhView', 'grid');
+  const rhShow = (on, bars, step) => (rhView() === 'notes' ? rhNotation(on, bars) : rhGrid(on, bars, step));
+  const rhViewToggle = () => `<div class="rh-view" role="group" aria-label="Affichage du rythme">${[['grid', 'Cases'], ['notes', 'Notes']].map(([v, l]) => `<button data-act="rh-view" data-v="${v}" aria-pressed="${rhView() === v}">${l}</button>`).join('')}</div>`;
+
+  /* ---------- Reconnaître un rythme ---------- */
+  const RR_DEFAULTS = { level: 'l2', diff: 'easy', choices: 3, bpm: 80, listen: 'twice', sound: 'wood', questions: 10 };
+  const rhKey = (on) => on.join(',');
+  /** Propositions : la bonne + des rythmes proches (difficile : un seul coup déplacé, ajouté ou enlevé). */
+  function rrChoices(level, diff, n) {
+    const target = rhGenerate(level, 1), set = [target], keys = new Set([rhKey(target)]);
+    const step = level === 'l6' ? 4 : level === 'l5' ? 3 : 6;
+    const why = {};
+    for (let k = 0; set.length < n && k < 200; k++) {
+      let c, w;
+      if (diff === 'hard') {
+        const t = [...target], r = Math.random();
+        const free = []; for (let x = 0; x < 48; x += step) if (!t.includes(x)) free.push(x);
+        if (r < 0.4 && t.length > 2) { const i = 1 + Math.floor(Math.random() * (t.length - 1)), nx = t[i] + (Math.random() < 0.5 ? -step : step); if (nx > 0 && nx < 48 && !t.includes(nx)) { t[i] = nx; c = t.sort((a, b) => a - b); w = 'coup déplacé'; } }
+        else if (r < 0.7 && free.length) { c = [...t, free[Math.floor(Math.random() * free.length)]].sort((a, b) => a - b); w = 'coup en plus'; }
+        else if (t.length > 2) { const i = 1 + Math.floor(Math.random() * (t.length - 1)); c = t.filter((_, j) => j !== i); w = 'coup en moins'; }
+      } else {
+        c = rhGenerate(level, 1); const a = new Set(target), b = new Set(c);
+        if ([...a].filter((x) => !b.has(x)).length + [...b].filter((x) => !a.has(x)).length < 2) c = null;
+        w = 'rythme confondu';
+      }
+      if (c && !keys.has(rhKey(c))) { keys.add(rhKey(c)); set.push(c); why[rhKey(c)] = w; }
+    }
+    for (let i = set.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [set[i], set[j]] = [set[j], set[i]]; }
+    return { target, choices: set, why };
+  }
+  /** Son du rythme : bloc de bois (par défaut) ou guitare étouffée. */
+  function rhSound(at, kind) {
+    if (kind !== 'mute') return woodHit(at);
+    const ctx = Piano.ctx;
+    if (!TON.noise) { const b = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; TON.noise = b; }
+    const src = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), o = ctx.createOscillator(), og = ctx.createGain();
+    src.buffer = TON.noise; f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 0.9;
+    g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(0.9, at + 0.003); g.gain.exponentialRampToValueAtTime(0.0001, at + 0.06);
+    o.type = 'triangle'; o.frequency.value = 98; og.gain.setValueAtTime(0.5, at); og.gain.exponentialRampToValueAtTime(0.0001, at + 0.05);
+    src.connect(f); f.connect(g); g.connect(Piano.out); o.connect(og); og.connect(Piano.out);
+    src.start(at, Math.random() * 0.5); src.stop(at + 0.08); o.start(at); o.stop(at + 0.07); TON.drums.push(src, o);
+  }
+  function renderSetupRecog() {
+    const { ex, settings: s } = draft;
+    $app.innerHTML = `
+      <header class="top"><button class="link-btn" data-act="home">‹ Accueil</button></header>
+      <div><span class="eyebrow">Réglages</span><h1>${esc(ex.title)}</h1></div>
+      <p class="hint">L'app joue un rythme d'une mesure : retrouve-le parmi les propositions. Tu peux afficher les rythmes en cases ou en notation, et changer pendant l'exercice.</p>
+      <div class="panel">
+        <div class="setting"><span class="lbl">Niveau</span>${seg('level', RH_LEVELS, s.level)}</div>
+        <div class="setting"><span class="lbl">Propositions</span>${seg('diff', [['easy', 'Faciles'], ['hard', 'Difficiles']], s.diff)}
+          <p class="hint">${s.diff === 'hard' ? 'Les propositions ne diffèrent que d\'un seul coup : déplacé, ajouté ou enlevé.' : 'Des rythmes bien différents les uns des autres.'}</p>
+          ${seg('choices', [[3, '3 propositions'], [4, '4 propositions']], s.choices)}</div>
+        <div class="setting"><label for="bpm">Tempo</label>
+          <div class="row-gap">${seg('bpm', [[60, 'Lent'], [80, 'Moyen'], [100, 'Rapide']], s.bpm)}
+          <input id="bpm" class="num" type="number" min="40" max="180" inputmode="numeric" value="${s.bpm}" aria-label="Tempo"><span class="muted">BPM</span></div></div>
+        <div class="setting"><span class="lbl">Écoute</span>${seg('listen', [['once', 'Une fois'], ['twice', 'Deux fois'], ['loop', 'En boucle']], s.listen)}</div>
+        <div class="setting"><span class="lbl">Son du rythme</span>${seg('sound', [['wood', 'Bloc de bois'], ['mute', 'Guitare étouffée']], s.sound)}</div>
+        <div class="setting"><label for="q-num">Nombre de questions</label>
+          <div class="row-gap">${seg('questions', [5, 10, 20].map((n) => [n, n]), s.questions)}
+          <span class="muted">ou</span><input id="q-num" class="num" type="number" min="1" max="200" inputmode="numeric" value="${s.questions}" aria-label="Nombre de questions personnalisé"></div></div>
+      </div>
+      <button class="btn wide" data-act="start">Commencer</button>`;
+  }
+  async function startRecogSession() {
+    const s = { ...draft.settings };
+    S = { type: 'rrecog', title: 'Reconnaître un rythme', set: s, n: Math.max(1, Math.min(200, s.questions || 10)), i: 0, firstTry: 0, missed: {}, skipped: 0 };
+    screen = 'play'; pushScreen();
+    $app.innerHTML = '<div class="loading">Chargement…</div>';
+    await Piano.unlock();
+    if (!S) return;
+    nextRecogQuestion();
+  }
+  function nextRecogQuestion() {
+    tonicStop();
+    S.i++;
+    const c = rrChoices(S.set.level, S.set.diff, Number(S.set.choices) || 3);
+    const all = c.choices.flat(), step = all.some((x) => x % 12 === 4 || x % 12 === 8) ? 4 : all.some((x) => x % 6 === 3) ? 3 : 6;
+    S.q = { ...c, step, answered: false, picked: null, helped: false, playing: null };
+    renderPlayRecog();
+    playRecog(S.q.target, true);
+  }
+  /** Joue un rythme (décompte d'une mesure, puis le rythme ; une fois, deux fois ou en boucle). */
+  function playRecog(on, question = false) {
+    tonicStop();
+    const s = S.set, q = S.q, ctx = Piano.ctx, beat = 60 / s.bpm, bar = 4 * beat;
+    const T0 = ctx.currentTime + 0.25;
+    for (let b = 0; b < 4; b++) improvClick(T0 + b * beat, b === 0);
+    const passes = question && !q.answered ? (s.listen === 'loop' ? Infinity : s.listen === 'twice' ? 2 : 1) : 1;
+    let done = 0, nextAt = T0 + bar;
+    const pass = (t) => { for (let b = 0; b < 4; b++) improvClick(t + b * beat, b === 0, 0.35); on.forEach((x) => rhSound(t + (x / 12) * beat, s.sound)); };
+    const pump = () => { while (S && S.q === q && done < passes && nextAt < Piano.ctx.currentTime + 0.8) { pass(nextAt); done++; nextAt += bar; } };
+    pump(); TON.pump = setInterval(pump, 120);
+    q.playing = on === q.target ? 'target' : rhKey(on);
+    if (passes > 1) loopBarSet(T0 + bar, bar, passes === Infinity ? Infinity : T0 + bar + passes * bar, '.rr-choices');
+  }
+  function answerRecog(k) {
+    const q = S.q; if (q.answered) return;
+    const on = q.choices[k];
+    q.answered = true; q.picked = k; q.correct = rhKey(on) === rhKey(q.target);
+    if (q.correct && !q.helped) S.firstTry++;
+    if (!q.correct) { const w = q.why[rhKey(on)] || 'rythme confondu'; S.missed[w] = (S.missed[w] || 0) + 1; }
+    tonicStop();
+    renderPlayRecog();
+  }
+  function renderPlayRecog() {
+    const s = S.set, q = S.q;
+    $app.innerHTML = `
+      <header class="top"><button class="link-btn" data-act="home">‹ Quitter</button><span class="eyebrow">Question ${S.i} / ${S.n}</span><span class="score">${S.firstTry} ✓</span></header>
+      <div class="progress"><i style="width:${((S.i - 1) / S.n) * 100}%"></i></div>
+      <div class="stage"><span class="eyebrow">Reconnaître un rythme · ${s.bpm} BPM</span>
+        <p class="status ${q.answered ? (q.correct ? 'good' : 'bad') : ''}">${q.answered ? (q.correct ? (q.helped ? '✓ Trouvé (après avoir écouté les propositions).' : '✓ Bravo !') : '✗ Pas celui-là : la bonne réponse est en vert. Écoute les deux pour comparer.') : 'Lequel de ces rythmes entends-tu ?'}</p></div>
+      <div class="rr-bar">${rhViewToggle()}<button class="link-btn" data-act="rr-replay">${ICON.note} Réécouter</button></div>
+      <div class="rr-choices">${q.choices.map((on, k) => {
+        const good = q.answered && rhKey(on) === rhKey(q.target), bad = q.answered && k === q.picked && !q.correct;
+        return `<div class="rr-card${good ? ' ok' : ''}${bad ? ' no' : ''}">
+          <button class="rr-pick" data-act="rr-answer" data-v="${k}" ${q.answered ? 'tabindex="-1"' : ''} aria-label="Proposition ${k + 1}">${rhShow(on, 1, q.step)}</button>
+          <button class="rr-hear" data-act="rr-hear" data-v="${k}" aria-label="Écouter la proposition ${k + 1}">▶</button></div>`; }).join('')}</div>
+      ${q.answered ? `<div class="actions"><button class="btn secondary" data-act="home">Quitter</button><button class="btn" data-act="rr-next">${S.i >= S.n ? 'Voir le bilan' : 'Question suivante'}</button></div>` : '<p class="hint" style="text-align:center">▶ : écouter une proposition (avant de répondre, ça compte comme une aide).</p>'}`;
+  }
 
   /* ---------- Contour : la forme d'une mélodie, de la basse ou de la voix du haut ---------- */
   const CONTOUR_DEFAULTS = { follow: 'melody', level: 'dir', length: 4, scale: 'major', tonalite: 'random-not-c', listen: 'twice', questions: 10 };
@@ -5672,12 +6054,12 @@ const Piano = (() => {
     renderPlayImprov();
   }
 
-  function improvClick(when, accent) {
+  function improvClick(when, accent, vol = 1) {
     const ctx = Piano.ctx;
     const o = ctx.createOscillator(), g = ctx.createGain();
     o.frequency.value = accent ? 1760 : 1175;
     g.gain.setValueAtTime(0.0001, when);
-    g.gain.exponentialRampToValueAtTime(accent ? 0.5 : 0.3, when + 0.002);
+    g.gain.exponentialRampToValueAtTime((accent ? 0.5 : 0.3) * vol, when + 0.002);
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
     o.connect(g); g.connect(ctx.destination);
     o.start(when); o.stop(when + 0.06);
@@ -6147,6 +6529,14 @@ const Piano = (() => {
       case 'rh-listen': { tonicStop(); const s = S.set, beat = 60 / s.bpm, t0 = Piano.ctx.currentTime + 0.2; for (let b = 0; b < 4 * (Number(s.bars) || 1); b++) improvClick(t0 + b * beat, b % 4 === 0); S.q.on.forEach((x) => woodHit(t0 + (x / 12) * beat)); break; }
       case 'rh-next': tonicStop(); if (S.i >= S.n) finish(); else nextRhythmQuestion(); break;
       case 'gr-go': startGroove(); break;
+      case 'echo-go': startEcho(); break;
+      case 'echo-stop': finishEcho(); break;
+      case 'echo-again': S.finished = false; S.results = []; startEcho(); break;
+      case 'rh-view': Store.set('rhView', v); if (S && S.type === 'rrecog') renderPlayRecog(); else if (S && S.type === 'rhythm') renderPlayRhythm(); else if (S && S.type === 'groove' && !S.running) renderPlayGroove(); break;
+      case 'rr-replay': playRecog(S.q.target); break;
+      case 'rr-hear': if (!S.q.answered) S.q.helped = true; playRecog(S.q.choices[Number(v)]); break;
+      case 'rr-answer': answerRecog(Number(v)); break;
+      case 'rr-next': tonicStop(); if (S.i >= S.n) finish(); else nextRecogQuestion(); break;
       case 'gr-stop': S.running = false; finishGroove(); break;
       case 'gr-again': S.finished = false; startGroove(); break;
       case 'ct-replay': playContour(true); break;
@@ -6307,7 +6697,7 @@ const Piano = (() => {
     }
   });
 
-  window.__ht = { get session() { return S; }, processRec, rhHit, get now() { return Piano.ctx && Piano.ctx.currentTime; } }; // pour les tests automatiques
+  window.__ht = { get session() { return S; }, processRec, rhHit, rhNotation, get now() { return Piano.ctx && Piano.ctx.currentTime; } }; // pour les tests automatiques
   renderHome();
   try { history.replaceState({ s: 'home' }, ''); } catch (e) {}
 })();
